@@ -9,6 +9,10 @@
 - 介面字串的原文是正體中文，翻譯在 `Resources/Localizable.xcstrings`（英、日、簡；正體中文那欄就是原文）。SwiftUI 的 `Text`、`Button`、`Label` 這類直接吃字串字面值的會自動翻譯；其他回傳 `String` 的（錯誤訊息、狀態列、`navigationTitle`、`show(...)`）一律包 `String(localized:)`。加了或改了字串，`make build` 之後跑 `scripts/sync-strings.sh` 把新字串收進目錄，再補英日簡翻譯和正體中文欄；它會列出還沒翻的字串，清單是空的才算完成。開發地區是英文：系統語言不是這四種時顯示英文。
 - repo 是公開的。個人的頻道清單只存在本機的 `library.json`，不要寫進程式碼、測試或文件。
 
+## 介紹頁
+
+- https://squelch.hiroki.im/ 的原始檔在 `~/GitHub/hiroki.im/squelch/`：文字（正體中文、英、日、簡）全在 `src/build.py`，改完跑 `python3 src/build.py` 再 `wrangler deploy`。功能或使用方式有變時一起改。版本號和下載按鈕自動跟最新的 GitHub Release，發版不用動它。
+
 ## 本機部署
 
 - 這台 Mac 只裝 `/Applications/Squelch.app`，而且只裝公證版：平常用 `scripts/ship.sh`（小版號自動加一、發版、安裝、打 tag、發 GitHub Release），要指定版本才分開跑 `scripts/release.sh <版本>`、`scripts/install.sh <版本>`。版本號以 git tag `v*` 為準，v0.5.1 之前的版本沒有 tag。
