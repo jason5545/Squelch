@@ -302,7 +302,9 @@ final class Library {
 
     // MARK: 頻道
 
-    func addChannel(_ input: String) async throws {
+    /// 回傳頻道名稱，給 `squelch://add` 顯示用。
+    @discardableResult
+    func addChannel(_ input: String) async throws -> String {
         guard let id = ChannelInput.normalize(input) else {
             throw YTDLPError.failed(String(localized: "看不懂這個頻道。可以貼 @handle、頻道網址或 UC 開頭的頻道 ID。"))
         }
@@ -313,6 +315,18 @@ final class Library {
         channels.append(Channel(id: id, title: feed.title, avatar: feed.avatar))
         apply(feed, to: id)
         save()
+        return feed.title
+    }
+
+    /// 給 `squelch://remove` 用：接受跟加入時一樣的寫法，大小寫不拘。回傳頻道名稱。
+    @discardableResult
+    func removeChannel(matching input: String) throws -> String {
+        guard let id = ChannelInput.normalize(input),
+              let channel = channels.first(where: { $0.id.caseInsensitiveCompare(id) == .orderedSame }) else {
+            throw YTDLPError.failed(String(localized: "清單裡沒有這個頻道。"))
+        }
+        removeChannel(channel.id)
+        return channel.title
     }
 
     func removeChannel(_ id: String) {

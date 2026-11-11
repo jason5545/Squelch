@@ -24,6 +24,16 @@ enum SelfTest {
         check(ChannelInput.normalize("youtube.com/channel/UCabcdefghijklmnopqrstuv/featured")
               == "https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv", "normalize /channel URL")
         check(ChannelInput.normalize("https://example.com/@x") == nil, "reject other host")
+        let cmd = { (s: String) in ChannelInput.command(from: URL(string: s)!) }
+        check(cmd("squelch://add?channel=@AppleDeveloper") == .add("@AppleDeveloper")
+              && cmd("squelch://subscribe?url=https://www.youtube.com/@AppleDeveloper/videos")
+                  == .add("https://www.youtube.com/@AppleDeveloper/videos")
+              && cmd("squelch://add/@AppleDeveloper") == .add("@AppleDeveloper"), "subscribe URL")
+        check(cmd("squelch://remove?channel=@AppleDeveloper") == .remove("@AppleDeveloper")
+              && cmd("squelch://unsubscribe/@AppleDeveloper") == .remove("@AppleDeveloper"), "unsubscribe URL")
+        check(cmd("squelch://add") == nil && cmd("squelch://play?channel=@x") == nil
+              && cmd("https://www.youtube.com/@x") == nil && cmd("squelch://add?channel=https://example.com/@x") == nil,
+              "channel URL rejects junk")
         check(ChannelInput.videoID("https://youtu.be/abcDEF12345?t=3") == "abcDEF12345", "videoID youtu.be")
         check(ChannelInput.videoID("https://www.youtube.com/watch?v=abcDEF12345&list=x") == "abcDEF12345", "videoID watch")
         check(ChannelInput.videoID("https://www.youtube.com/live/abc-EF_2345") == "abc-EF_2345", "videoID live")

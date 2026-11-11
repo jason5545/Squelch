@@ -99,6 +99,26 @@ nonisolated enum ChannelInput {
         return "https://www.youtube.com/\(s)"
     }
 
+    enum URLCommand: Equatable {
+        case add(String)
+        case remove(String)
+    }
+
+    /// 解析 `squelch://add?channel=@handle`、`squelch://remove?channel=@handle`，頻道原樣交給 `normalize`。
+    /// 也接受 `url=`、`subscribe`／`unsubscribe`、`squelch://add/@handle`。看不懂就回傳 nil。
+    static func command(from url: URL) -> URLCommand? {
+        guard url.scheme?.lowercased() == "squelch", let host = url.host?.lowercased(),
+              let c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        let fromQuery = c.queryItems?.first { ["channel", "url"].contains($0.name) }?.value
+        let fromPath = c.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let raw = fromQuery ?? (fromPath.isEmpty ? nil : fromPath), normalize(raw) != nil else { return nil }
+        switch host {
+        case "add", "subscribe": return .add(raw)
+        case "remove", "unsubscribe": return .remove(raw)
+        default: return nil
+        }
+    }
+
     /// 從影片網址或 11 碼 ID 取出影片 ID。
     static func videoID(_ raw: String) -> String? {
         let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)

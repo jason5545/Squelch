@@ -2939,6 +2939,34 @@
         }
       }
     },
+    "清單裡沒有這個頻道。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That channel isn't in your list."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このチャンネルはリストにありません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列表里没有这个频道。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清單裡沒有這個頻道。"
+          }
+        }
+      }
+    },
     "準備中": {
       "localizations": {
         "en": {

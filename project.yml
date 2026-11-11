@@ -33,6 +33,16 @@ targets:
         buildPhase: resources
       - path: Resources/Localizable.xcstrings
         buildPhase: resources
+    # 其他鍵由 GENERATE_INFOPLIST_FILE 產生，這份只放它產生不了的 URL scheme（squelch://add?channel=@handle）。
+    info:
+      path: Resources/Info.plist
+      properties:
+        # xcodegen 預設寫死 1.0／1，改成跟著 release.sh 帶進來的版本號。
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleURLTypes:
+          - CFBundleURLName: io.github.jason5545.Squelch
+            CFBundleURLSchemes: [squelch]
     settings:
       base:
         PRODUCT_NAME: Squelch

@@ -31,6 +31,43 @@ enum Main {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static weak var player: Player?
+    static weak var library: Library?
+
+    // `squelch://add?channel=@handle`：App 開著也能直接訂閱，不用關掉再改 library.json。
+    // 自己接 Apple Event，不用 SwiftUI 的 onOpenURL：那個會把主視窗叫到前面。
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(
+            self, andSelector: #selector(handleURLEvent(_:reply:)),
+            forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
+    }
+
+    @objc private func handleURLEvent(_ event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {
+        guard let text = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue,
+              let url = URL(string: text) else { return }
+        guard let command = ChannelInput.command(from: url) else {
+            NSLog("Squelch: 看不懂這個網址：%@", text)
+            return
+        }
+        guard let library = Self.library else { return }
+        switch command {
+        case .add(let input):
+            Task {
+                do {
+                    let title = try await library.addChannel(input)
+                    NSLog("Squelch: 已加入頻道 %@", title)
+                } catch {
+                    NSLog("Squelch: 加入 %@ 失敗：%@", input, error.localizedDescription)
+                }
+            }
+        case .remove(let input):
+            do {
+                let title = try library.removeChannel(matching: input)
+                NSLog("Squelch: 已移除頻道 %@", title)
+            } catch {
+                NSLog("Squelch: 移除 %@ 失敗：%@", input, error.localizedDescription)
+            }
+        }
+    }
 
     // 關掉視窗照樣在背景播，從選單列或 Dock 叫回來。
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -56,6 +93,7 @@ struct SquelchApp: App {
         _library = State(initialValue: library)
         _player = State(initialValue: player)
         AppDelegate.player = player
+        AppDelegate.library = library
         library.startAutoRefresh()
         library.startLiveWatch()
         Task.detached(priority: .background) { YTDLP.pruneCache() }
