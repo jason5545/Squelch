@@ -13,3 +13,4 @@
 - 這台 Mac 只裝 `/Applications/Squelch.app`，而且只裝公證版：`scripts/release.sh <版本>` 產出 zip，再 `scripts/install.sh <版本>` 安裝。
 - 不要把 `make build` 的 Debug 版複製進 `/Applications`。
 - 改版本時兩個腳本都帶同一個版本號，`project.yml` 的 `MARKETING_VERSION` 只是預設值。
+- AVPlayer 跳轉後偶爾「狀態是播放中但時間不走」（自我測試約每六次一次）。`Player.checkStall` 偵測到 2.5 秒沒前進就用 `Player.nudge` 輕推，自我測試用同一套處理，卡住時印 `stalled after seek`。原因還沒查到，看門狗不要拿掉。

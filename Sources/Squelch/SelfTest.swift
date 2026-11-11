@@ -131,11 +131,18 @@ enum SelfTest {
         await player.seek(to: CMTime(seconds: middle, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         player.playImmediately(atRate: 2)
         try? await Task.sleep(for: .seconds(3))
-        let t2 = player.currentTime().seconds
+        var t2 = player.currentTime().seconds
         if t2 - middle <= 3 {
-            print("diag  \(label): rate=\(player.rate) tcs=\(player.timeControlStatus.rawValue) reason=\(player.reasonForWaitingToPlay?.rawValue ?? "-") t2=\(t2) status=\(item.status.rawValue) err=\(item.error?.localizedDescription ?? "-") end=\(item.forwardPlaybackEndTime.seconds)")
+            // 偶發的「播放中但時間不走」：用 App 裡同一套輕推，要能自己恢復。
+            print("info  \(label): stalled after seek (rate=\(player.rate) tcs=\(player.timeControlStatus.rawValue) t=\(t2)), nudging")
+            await Player.nudge(player, rate: 2)
+            let resumeAt = player.currentTime().seconds
+            try? await Task.sleep(for: .seconds(3))
+            t2 = player.currentTime().seconds
+            check(t2 - resumeAt > 3, "\(label): recovered after nudge: advanced \(String(format: "%.1f", t2 - resumeAt))s in 3s")
+        } else {
+            check(true, "\(label): seek to \(Format.time(middle)) at 2×: advanced \(String(format: "%.1f", t2 - middle))s in 3s")
         }
-        check(t2 - middle > 3, "\(label): seek to \(Format.time(middle)) at 2×: advanced \(String(format: "%.1f", t2 - middle))s in 3s")
         player.pause()
         if stream.isLocal {
             let blocks = Boost.processedBlocks.load(ordering: .relaxed) - blocksBefore

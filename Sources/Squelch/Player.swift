@@ -55,6 +55,9 @@ final class Player {
     @ObservationIgnored private var lastSaved = Date.distantPast
     @ObservationIgnored private var loadToken = UUID()
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
+    @ObservationIgnored private var stallTimer: Timer?
+    @ObservationIgnored private var lastProgress: Double = -1
+    @ObservationIgnored private var stalledSince: Date?
 
     init(library: Library) {
         self.library = library
@@ -84,6 +87,41 @@ final class Player {
         }
         nowPlaying.attach(self)
         applyVolume()
+        stallTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { @Sendable [weak self] _ in
+            Task { @MainActor in self?.checkStall() }
+        }
+    }
+
+    // MARK: 卡住偵測
+
+    /// 跳轉後偶爾會出現「狀態是播放中、速度正常、沒有在等緩衝，但時間不走」（自我測試大約每六次一次，
+    /// 2026/11/11 抓到 rate=2 tcs=playing reason=nil，時間停在跳轉的位置）。時間 2.5 秒沒前進就在原位輕推一下。
+    private func checkStall() {
+        guard isPlaying, !isLoading, !isLive, avPlayer.timeControlStatus == .playing else {
+            stalledSince = nil
+            return
+        }
+        let t = avPlayer.currentTime().seconds
+        if abs(t - lastProgress) > 0.05 {
+            lastProgress = t
+            stalledSince = nil
+            return
+        }
+        guard let since = stalledSince else {
+            stalledSince = Date()
+            return
+        }
+        if Date().timeIntervalSince(since) >= 2.5 {
+            stalledSince = nil
+            Task { await Self.nudge(avPlayer, rate: rate) }
+        }
+    }
+
+    /// 在目前位置往後 0.05 秒重新跳一次再開播，讓卡住的播放管線重新起來。
+    static func nudge(_ player: AVPlayer, rate: Float) async {
+        let t = player.currentTime().seconds
+        await player.seek(to: CMTime(seconds: t + 0.05, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        player.playImmediately(atRate: rate)
     }
 
     // MARK: 音量
