@@ -127,7 +127,7 @@ struct SettingsView: View {
                 } else {
                     Button("登入 YouTube…") { showingLogin = true }
                 }
-                Text("登入只用在兩件事：抓訂閱動態（含直播），以及把播放紀錄和進度回報給 YouTube。解析音軌不帶帳號。yt-dlp 官方提醒，帳號搭配 yt-dlp 有被封鎖的風險；Squelch 帶帳號的請求大約每 30 分鐘一次，加上每部影片幾次回報。")
+Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次，以及把播放紀錄回報給 YouTube（每部影片約 10 次）。自動更新、解析音軌、搜尋都不帶帳號。yt-dlp 官方提醒，帳號搭配 yt-dlp 有被封鎖的風險。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("yt-dlp") {

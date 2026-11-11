@@ -98,24 +98,9 @@ final class Library {
         guard !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
+        // 自動更新完全不碰帳號：只抓 Squelch 自己的頻道。訂閱動態見 `loadSubscriptions`。
         let targets = channels.map { ($0.id, $0.includeStreams) }
         var liveIDs = Set<String>()
-        // 只有訂閱動態帶帳號；各頻道清單照舊不帶。
-        if let account, account.isLoggedIn {
-            do {
-                let feed = try await YTDLP.subscriptions(cookies: account.cookieFile)
-                await account.importCookieFile()
-                for var ep in feed {
-                    if let old = episodes[ep.id], !ep.liveNow { ep.published = old.published ?? ep.published }
-                    episodes[ep.id] = ep
-                    if ep.liveNow { liveIDs.insert(ep.id) }
-                }
-                subscriptionFeed = feed.map(\.id)
-                channelErrors[YTDLP.subscriptionsURL] = nil
-            } catch {
-                channelErrors[YTDLP.subscriptionsURL] = error.localizedDescription
-            }
-        }
         await withTaskGroup(of: (String, Result<ChannelFeed, Error>).self) { group in
             for (id, streams) in targets {
                 group.addTask {
@@ -137,13 +122,52 @@ final class Library {
                 }
             }
         }
-        // 直播結束後不會再標成直播中。
-        for (id, ep) in episodes where ep.liveNow != liveIDs.contains(id) {
-            episodes[id]?.isLive = liveIDs.contains(id) ? true : nil
-        }
+        channelLive = liveIDs
+        applyLiveFlags()
         lastRefresh = Date()
         prune()
         save()
+    }
+
+    // MARK: 訂閱動態（要登入，看的時候才抓）
+
+    @ObservationIgnored private var channelLive = Set<String>()
+    @ObservationIgnored private var subscriptionLive = Set<String>()
+    var subscriptionsFetched: Date?
+    var subscriptionsLoading = false
+
+    /// 訂閱 329 個頻道，匿名一個一個抓會超過 YouTube 對不登入的限流，所以用帳號抓 YouTube 的訂閱頁，
+    /// 但只在打開「訂閱動態」或按重新整理時抓（距上次超過 10 分鐘才抓，`force` 例外）。背景完全不碰帳號。
+    func loadSubscriptions(force: Bool = false) async {
+        guard let account, account.isLoggedIn, !subscriptionsLoading else { return }
+        if !force, let last = subscriptionsFetched, Date().timeIntervalSince(last) < 10 * 60 { return }
+        subscriptionsLoading = true
+        defer { subscriptionsLoading = false }
+        do {
+            let feed = try await YTDLP.subscriptions(cookies: account.cookieFile)
+            await account.importCookieFile()
+            for var ep in feed {
+                if let old = episodes[ep.id], !ep.liveNow { ep.published = old.published ?? ep.published }
+                episodes[ep.id] = ep
+            }
+            subscriptionFeed = feed.map(\.id)
+            subscriptionLive = Set(feed.filter(\.liveNow).map(\.id))
+            subscriptionsFetched = Date()
+            channelErrors[YTDLP.subscriptionsURL] = nil
+            applyLiveFlags()
+            prune()
+            save()
+        } catch {
+            channelErrors[YTDLP.subscriptionsURL] = error.localizedDescription
+        }
+    }
+
+    /// 直播中的標記以最近一次抓到的為準，直播結束後不會一直標著。
+    private func applyLiveFlags() {
+        let live = channelLive.union(subscriptionLive)
+        for (id, ep) in episodes where ep.liveNow != live.contains(id) {
+            episodes[id]?.isLive = live.contains(id) ? true : nil
+        }
     }
 
     private func apply(_ feed: ChannelFeed, to channelID: String) {

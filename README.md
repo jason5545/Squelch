@@ -67,11 +67,12 @@ AVPlayer 的音量最大 100%，要更大聲只能在音訊路徑上加增益（
 
 帳號只用在三件事：
 
-- 訂閱動態：`yt-dlp --cookies` 抓 `youtube.com/feed/subscriptions`，每 30 分鐘一次。yt-dlp 跑完會把輪換過的 cookie 寫回檔案，Squelch 再讀回 WebKit。
+- 訂閱動態：`yt-dlp --cookies` 抓 `youtube.com/feed/subscriptions`，只在打開「訂閱動態」或按重新整理時抓，距上次超過 10 分鐘才抓。yt-dlp 跑完會把輪換過的 cookie 寫回檔案，Squelch 再讀回 WebKit。
+  （不改成匿名一個一個抓頻道：訂閱幾百個頻道時，每輪幾百個請求，會超過 YouTube 對不登入的限流，連音軌和搜尋都會卡住。頻道 RSS 在 2026/11 已經回 404。）
 - 觀看記錄：`yt-dlp --cookies` 抓 `youtube.com/feed/history`，只在打開清單或按重新整理時抓。
-- 播放紀錄：從登入狀態的影片頁取得 `playbackTracking` 的兩個回報網址，開始播時送 `videostatsPlaybackUrl`（進觀看記錄），播放中每 20 秒和暫停、跳轉時送 `videostatsWatchtimeUrl`（帶真正的位置）。參數照 yt-dlp 的 `_mark_watched`，但不會一律標成看完。
+- 播放紀錄：從登入狀態的影片頁取得 `playbackTracking` 的兩個回報網址，開始播時送 `videostatsPlaybackUrl`（進觀看記錄）；暫停、跳轉、聽完、換集時，以及播放中每 5 分鐘，送 `videostatsWatchtimeUrl`（帶真正的位置）。45 分鐘的影片大約 10 次回報。參數照 yt-dlp 的 `_mark_watched`，但不會一律標成看完。
 
-解析音軌和搜尋不帶帳號。yt-dlp 官方提醒：帳號搭配 yt-dlp 有被封鎖（暫時或永久）的風險，所以帶帳號的請求越少越好。
+每 30 分鐘的自動更新完全不碰帳號（自我測試會檢查）；平常使用時帶帳號的請求只有播放紀錄回報，每部影片約 10 次，其他都是你打開或按了才抓。解析音軌和搜尋不帶帳號。yt-dlp 官方提醒：帳號搭配 yt-dlp 有被封鎖（暫時或永久）的風險，所以帶帳號的請求越少越好。
 
 ## 資料
 

@@ -11,7 +11,9 @@ import Foundation
 final class WatchHistory {
     private let account: Account
     private var session: Session?
-    private static let pingInterval: TimeInterval = 20
+    /// 帶帳號的請求越少越好：只在開始、暫停、跳轉、聽完、換集時回報，播放中每 5 分鐘補一次
+    /// （App 被直接關掉時，最多少記 5 分鐘）。45 分鐘的影片大約 10 次，原本每 20 秒一次約 140 次。
+    static let pingInterval: TimeInterval = 300
 
     private final class Session {
         let videoID: String
@@ -43,7 +45,7 @@ final class WatchHistory {
         }
     }
 
-    /// 播放中每 0.5 秒呼叫一次；每 20 秒回報一段。
+    /// 播放中每 0.5 秒呼叫一次；每 5 分鐘回報一段。
     func tick(at position: Double, playing: Bool) {
         guard let session, session.ready, playing,
               Date().timeIntervalSince(session.lastPing) >= Self.pingInterval else { return }

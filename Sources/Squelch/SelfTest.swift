@@ -85,6 +85,7 @@ enum SelfTest {
             print("info  SponsorBlock segments: \(segments.map { "\($0.category) \(Format.time($0.start))–\(Format.time($0.end))" })")
         }
 
+        await refreshAvoidsAccount(channel: channel)
         await accountChecks()
         await live()
         persistence(channel: channel)
@@ -141,6 +142,25 @@ enum SelfTest {
             check(blocks > 50, "\(label): boost tap processed \(blocks) audio blocks")
             Boost.gain = 1
         }
+    }
+
+    /// 自動更新（每 30 分鐘）不准碰帳號：在「已登入」的狀態下跑一次，帶 cookie 的 yt-dlp 呼叫次數不能增加。
+    private static func refreshAvoidsAccount(channel: String) async {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-noacct-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fakeCookies = dir.appendingPathComponent("cookies.txt")
+        FileManager.default.createFile(atPath: fakeCookies.path, contents: Data("# test\n".utf8))
+        let account = Account(cookieFile: fakeCookies, checkWebKit: false)
+        let library = Library(directory: dir)
+        library.account = account
+        library.channels = [Channel(id: channel, title: "test")]
+        let before = YTDLP.accountCalls.load(ordering: .relaxed)
+        await library.refresh()
+        let after = YTDLP.accountCalls.load(ordering: .relaxed)
+        check(account.isLoggedIn && after == before && !library.episodes.isEmpty,
+              "auto refresh while logged in makes no account requests (\(after - before))")
+        check(WatchHistory.pingInterval >= 300, "watch-time reports at most every 5 minutes while playing")
     }
 
     private static func accountChecks() async {

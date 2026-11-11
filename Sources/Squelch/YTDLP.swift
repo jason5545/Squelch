@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 nonisolated enum YTDLPError: LocalizedError {
     case notFound
@@ -28,7 +29,11 @@ nonisolated enum YTDLP {
     }
 
     /// 執行 yt-dlp 並回傳 stdout。stdout 和 stderr 同時讀，避免輸出太大把管線塞住。
+    /// 帶帳號的 yt-dlp 呼叫次數。自我測試用來確認自動更新不碰帳號。
+    static let accountCalls = Atomic<Int>(0)
+
     static func run(_ arguments: [String], cookies: URL? = nil) async throws -> Data {
+        if cookies != nil { accountCalls.add(1, ordering: .relaxed) }
         let arguments = cookies.map { ["--cookies", $0.path] + arguments } ?? arguments
         guard let path = binaryPath() else { throw YTDLPError.notFound }
         return try await withCheckedThrowingContinuation { continuation in

@@ -49,10 +49,11 @@ struct ContentView: View {
                 Button {
                     Task {
                         if selection == .history { await library.loadHistory() }
+                        if selection == .subscriptions { await library.loadSubscriptions(force: true) }
                         await library.refresh()
                     }
                 } label: {
-                    if library.refreshing {
+                    if library.refreshing || library.subscriptionsLoading || library.historyLoading {
                         ProgressView().controlSize(.small)
                     } else {
                         Label("重新整理", systemImage: "arrow.clockwise")
@@ -169,6 +170,7 @@ struct EpisodeList: View {
         .navigationSubtitle(subtitle(episodes))
         .task(id: item) {
             if item == .history { await library.loadHistory() }
+            if item == .subscriptions { await library.loadSubscriptions() }
         }
     }
 
@@ -237,7 +239,7 @@ struct EpisodeList: View {
                 } description: {
                     Text("按右上角的人像登入 YouTube。")
                 }
-            } else if library.refreshing {
+            } else if library.subscriptionsLoading {
                 ProgressView("正在抓訂閱動態…")
             } else {
                 ContentUnavailableView("訂閱動態是空的", systemImage: "person.2.wave.2",
@@ -270,6 +272,9 @@ struct EpisodeList: View {
 
     private func subtitle(_ episodes: [Episode]) -> String {
         if item == .subscriptions, let error = library.channelErrors[YTDLP.subscriptionsURL] { return "更新失敗：\(error)" }
+        if item == .subscriptions, let fetched = library.subscriptionsFetched {
+            return "\(episodes.count) 部 · \(fetched.formatted(date: .omitted, time: .shortened)) 更新，打開這裡或按重新整理才會再抓"
+        }
         if item == .history { return account.isLoggedIn ? "YouTube 觀看記錄（含手機）" : "Squelch 本機記錄" }
         if item == .search, library.searching { return "搜尋中…" }
         let total = episodes.reduce(0) { $0 + ($1.duration ?? 0) }

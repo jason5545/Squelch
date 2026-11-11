@@ -20,7 +20,7 @@ struct LoginSheet: View {
                     await account.refreshState()
                     guard account.isLoggedIn else { return }
                     dismiss()
-                    await library.refresh()
+                    await library.loadSubscriptions(force: true)
                 }
             }
         }
