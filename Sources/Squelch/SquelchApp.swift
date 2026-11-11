@@ -9,7 +9,8 @@ enum Main {
         if let index = CommandLine.arguments.firstIndex(of: "--snapshot"), index + 1 < CommandLine.arguments.count {
             let path = CommandLine.arguments[index + 1]
             Task { @MainActor in
-                await Snapshot.render(to: URL(fileURLWithPath: path))
+                let item: SidebarItem = CommandLine.arguments.contains("--subscriptions") ? .subscriptions : .latest
+                await Snapshot.render(to: URL(fileURLWithPath: path), item: item)
                 exit(0)
             }
             NSApplication.shared.setActivationPolicy(.accessory)

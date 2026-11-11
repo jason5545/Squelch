@@ -280,6 +280,7 @@ final class Library {
             return episodes.values.filter { ep in channels.contains { $0.id == ep.channelID } }
                 .sorted { a, b in a.liveNow != b.liveNow ? a.liveNow : Self.newestFirst(a, b) }
         case .subscriptions:
+            guard account?.isLoggedIn == true else { return [] }
             return subscriptionFeed.compactMap { episodes[$0] }
                 .sorted { a, b in a.liveNow != b.liveNow ? a.liveNow : Self.newestFirst(a, b) }
         case .inProgress:

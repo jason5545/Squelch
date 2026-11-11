@@ -4,7 +4,11 @@ struct ContentView: View {
     @Environment(Library.self) private var library
     @Environment(Player.self) private var player
     @Environment(Account.self) private var account
-    @State private var selection: SidebarItem? = .latest
+    @State private var selection: SidebarItem?
+
+    init(initialSelection: SidebarItem = .latest) {
+        _selection = State(initialValue: initialSelection)
+    }
     @State private var showingAddChannel = false
     @State private var showingPlayURL = false
     @State private var showingLogin = false
@@ -27,10 +31,7 @@ struct ContentView: View {
                     Menu {
                         Text("已登入 YouTube")
                         Button("登出") {
-                            Task {
-                                await account.logout()
-                                if selection == .subscriptions { selection = .latest }
-                            }
+                            Task { await account.logout() }
                         }
                     } label: {
                         Label("帳號", systemImage: "person.crop.circle.fill")
@@ -76,17 +77,9 @@ struct Sidebar: View {
     var body: some View {
         List(selection: $selection) {
             Label("最新", systemImage: "tray.full").tag(SidebarItem.latest)
-            if account.isLoggedIn {
-                HStack {
-                    Label("訂閱動態", systemImage: "person.2.wave.2")
-                    Spacer()
-                    if let error = library.channelErrors[YTDLP.subscriptionsURL] {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).help(error)
-                    }
-                }
-                .tag(SidebarItem.subscriptions)
-                .badge(library.list(for: .subscriptions).filter(\.liveNow).count)
-            }
+            // 0.2.0 這一列是登入後才插入、外面包 HStack，點了沒反應；改成一律顯示、跟其他列同樣的結構。
+            Label("訂閱動態", systemImage: "person.2.wave.2").tag(SidebarItem.subscriptions)
+                .badge(account.isLoggedIn ? library.list(for: .subscriptions).filter(\.liveNow).count : 0)
             Label("聽到一半", systemImage: "clock.arrow.circlepath").tag(SidebarItem.inProgress)
                 .badge(library.progress.count)
             Label("待播清單", systemImage: "list.bullet").tag(SidebarItem.queue)
@@ -136,6 +129,7 @@ struct ChannelRow: View {
 
 struct EpisodeList: View {
     @Environment(Library.self) private var library
+    @Environment(Account.self) private var account
     @Environment(Player.self) private var player
     let item: SidebarItem
 
@@ -196,7 +190,13 @@ struct EpisodeList: View {
         case .inProgress:
             ContentUnavailableView("沒有聽到一半的", systemImage: "clock.arrow.circlepath")
         case .subscriptions:
-            if library.refreshing {
+            if !account.isLoggedIn {
+                ContentUnavailableView {
+                    Label("登入後才有訂閱動態", systemImage: "person.2.wave.2")
+                } description: {
+                    Text("按右上角的人像登入 YouTube。")
+                }
+            } else if library.refreshing {
                 ProgressView("正在抓訂閱動態…")
             } else {
                 ContentUnavailableView("訂閱動態是空的", systemImage: "person.2.wave.2",
@@ -226,6 +226,7 @@ struct EpisodeList: View {
     }
 
     private func subtitle(_ episodes: [Episode]) -> String {
+        if item == .subscriptions, let error = library.channelErrors[YTDLP.subscriptionsURL] { return "更新失敗：\(error)" }
         let total = episodes.reduce(0) { $0 + ($1.duration ?? 0) }
         return episodes.isEmpty ? "" : "\(episodes.count) 部 · 共 \(Format.time(total))"
     }

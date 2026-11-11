@@ -4,7 +4,7 @@ import SwiftUI
 /// `Squelch --snapshot out.png`：把主視窗畫成 PNG，用真的頻道資料，不需要螢幕錄影權限。
 @MainActor
 enum Snapshot {
-    static func render(to url: URL) async {
+    static func render(to url: URL, item: SidebarItem = .latest) async {
         let library = Library()
         if library.episodes.isEmpty { await library.refresh() }
         let player = Player(library: library)
@@ -14,10 +14,10 @@ enum Snapshot {
             player.position = player.duration * 0.31
             player.segments = [SkipSegment(start: 101, end: 195, category: "sponsor")]
         }
-        let view = ContentView()
+        let view = ContentView(initialSelection: item)
             .environment(library)
             .environment(player)
-            .environment(Account())
+            .environment(Account(checkWebKit: false))
             .frame(width: 1100, height: 700)
         let host = NSHostingView(rootView: view)
         host.frame = NSRect(x: 0, y: 0, width: 1100, height: 700)

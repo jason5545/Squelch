@@ -115,6 +115,7 @@ nonisolated enum YTDLP {
             // 訂閱動態混了很多頻道，頻道資訊要從每一筆拿。
             var epChannelID = channelID, epChannelTitle = title
             if channelID == subscriptionsURL {
+                epChannelID = ""   // 少數項目（例如首播）yt-dlp 不給頻道 ID，只有名稱。
                 if let handle = entry["uploader_id"] as? String, handle.hasPrefix("@") {
                     epChannelID = "https://www.youtube.com/\(handle)"
                 } else if let cid = entry["channel_id"] as? String {
