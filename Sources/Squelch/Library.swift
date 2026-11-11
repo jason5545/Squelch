@@ -171,7 +171,21 @@ final class Library {
         }
     }
 
-    // MARK: 直播檢查（勾選的頻道、不帶帳號、只在按重新整理時跑）
+    // MARK: 直播檢查（勾選的頻道，每 10 分鐘自動查，不帶帳號、不用 yt-dlp）
+
+    @ObservationIgnored private var liveWatchTask: Task<Void, Never>?
+    static let liveCheckInterval: Duration = .seconds(10 * 60)
+
+    /// App 開著時每 10 分鐘查一次勾選的頻道。一個頻道一個網頁請求，只勾 Theo 的話一小時 6 個。
+    func startLiveWatch() {
+        liveWatchTask?.cancel()
+        liveWatchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.checkLive()
+                try? await Task.sleep(for: Library.liveCheckInterval)
+            }
+        }
+    }
 
     var liveWatchChannels: [Channel] { channels.filter { $0.watchLive == true } }
 
@@ -191,15 +205,13 @@ final class Library {
         checkingLive = true
         defer { checkingLive = false }
         var found: [Episode] = []
-        await withTaskGroup(of: [Episode].self) { group in
+        let titles = Dictionary(uniqueKeysWithValues: liveWatchChannels.map { ($0.id, $0.title) })
+        await withTaskGroup(of: Episode?.self) { group in
             for id in targets {
-                group.addTask {
-                    // 沒有直播分頁的頻道會回錯誤，當成沒在直播。
-                    let feed = try? await YTDLP.tab(channelID: id, path: "streams", limit: 3, isStream: true)
-                    return feed?.episodes.filter(\.liveNow) ?? []
-                }
+                let title = titles[id] ?? ""
+                group.addTask { await LiveProbe.check(channelID: id, channelTitle: title) }
             }
-            for await lives in group { found += lives }
+            for await live in group { if let live { found.append(live) } }
         }
         for ep in found {
             var merged = ep

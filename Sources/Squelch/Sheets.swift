@@ -139,7 +139,7 @@ Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次�
                         get: { channel.watchLive == true },
                         set: { library.setWatchLive(channel.id, $0) }))
                 }
-                Text("勾選的頻道在按重新整理時檢查有沒有在直播（不帶帳號），沒按就顯示上次的結果。")
+                Text("勾選的頻道每 10 分鐘自動檢查一次有沒有在直播（打開頻道的 /live 網頁，一個頻道一個請求，不帶帳號、不用 yt-dlp）。按重新整理會立刻查。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("yt-dlp") {

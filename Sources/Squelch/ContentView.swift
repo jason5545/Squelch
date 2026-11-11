@@ -48,7 +48,6 @@ struct ContentView: View {
                     .help("加入頻道")
                 Button {
                     Task {
-                        // 直播狀態只在按重新整理時查（勾選的頻道、不帶帳號），自動更新用快取。
                         await library.checkLive()
                         if selection == .history { await library.loadHistory() }
                         if selection == .subscriptions { await library.loadSubscriptions(force: true) }
@@ -132,7 +131,7 @@ struct ChannelRow: View {
             }
         }
         .contextMenu {
-            Toggle("按重新整理時檢查直播", isOn: Binding(
+            Toggle("檢查直播", isOn: Binding(
                 get: { channel.watchLive == true },
                 set: { library.setWatchLive(channel.id, $0) }))
             Toggle("包含直播回放", isOn: Binding(
@@ -178,6 +177,9 @@ struct EpisodeList: View {
         .task(id: item) {
             if item == .history { await library.loadHistory() }
             if item == .subscriptions { await library.loadSubscriptions() }
+            if item == .live, (library.liveChecked.map { Date().timeIntervalSince($0) > 120 } ?? true) {
+                await library.checkLive()
+            }
         }
     }
 
@@ -282,8 +284,8 @@ struct EpisodeList: View {
 
     private var liveStatusText: String {
         let names = library.liveWatchChannels.map(\.title).joined(separator: "、")
-        guard let checked = library.liveChecked else { return "檢查：\(names)。按重新整理才會查。" }
-        return "檢查：\(names) · \(checked.formatted(date: .omitted, time: .shortened)) 查的，按重新整理才會再查"
+        guard let checked = library.liveChecked else { return "檢查：\(names)，每 10 分鐘自動查一次" }
+        return "檢查：\(names) · \(checked.formatted(date: .omitted, time: .shortened)) 查的，每 10 分鐘自動查一次"
     }
 
     private var title: String {

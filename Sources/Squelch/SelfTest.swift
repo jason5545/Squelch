@@ -258,6 +258,13 @@ enum SelfTest {
 
     /// 勾選頻道的直播檢查：按重新整理才查、不帶帳號；自動更新不動快取。
     private static func liveWatch() async {
+        let lofi = await LiveProbe.check(channelID: "https://www.youtube.com/@LofiGirl", channelTitle: "Lofi Girl")
+        check(lofi?.liveNow == true && lofi?.id.count == 11, "live probe: 24h stream channel is live (\(lofi?.title.prefix(30) ?? "nil"))")
+        check(LiveProbe.parse(html: "<html><body>channel home, no player</body></html>", channelID: "x", channelTitle: "x") == nil,
+              "live probe: channel page without a player is not live")
+        let upcoming = #"ytInitialPlayerResponse = {"videoDetails":{"videoId":"abcDEF12345","title":"t","isUpcoming":true,"isLiveContent":true}};"#
+        check(LiveProbe.parse(html: upcoming, channelID: "x", channelTitle: "x") == nil, "live probe: scheduled stream is not live")
+
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-livewatch-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let library = Library(directory: dir)

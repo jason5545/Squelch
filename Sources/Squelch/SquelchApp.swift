@@ -56,6 +56,7 @@ struct SquelchApp: App {
         _player = State(initialValue: player)
         AppDelegate.player = player
         library.startAutoRefresh()
+        library.startLiveWatch()
         Task.detached(priority: .background) { YTDLP.pruneCache() }
     }
 
