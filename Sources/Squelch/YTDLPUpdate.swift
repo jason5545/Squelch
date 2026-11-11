@@ -90,13 +90,13 @@ nonisolated enum YTDLPUpdate {
         try? fm.removeItem(at: stage)
         defer { try? fm.removeItem(at: stage) }
 
-        let (sums, sumsResponse) = try await URLSession.shared.data(from: URL(string: base + "SHA2-256SUMS")!)
+        let (sums, sumsResponse) = try await retrying { try await URLSession.shared.data(from: URL(string: base + "SHA2-256SUMS")!) }
         guard (sumsResponse as? HTTPURLResponse)?.statusCode == 200,
               let expected = String(decoding: sums, as: UTF8.self).split(separator: "\n")
                 .first(where: { $0.hasSuffix(" yt-dlp_macos.zip") })?.split(separator: " ").first.map(String.init) else {
             throw YTDLPError.failed(String(localized: "yt-dlp 新版的雜湊值抓不到。"))
         }
-        let (zip, zipResponse) = try await URLSession.shared.download(from: URL(string: base + "yt-dlp_macos.zip")!)
+        let (zip, zipResponse) = try await retrying { try await URLSession.shared.download(from: URL(string: base + "yt-dlp_macos.zip")!) }
         defer { try? fm.removeItem(at: zip) }
         guard (zipResponse as? HTTPURLResponse)?.statusCode == 200 else {
             throw YTDLPError.failed(String(localized: "yt-dlp 新版下載失敗。"))
@@ -122,6 +122,18 @@ nonisolated enum YTDLPUpdate {
         if fm.fileExists(atPath: target.path) { try fm.moveItem(at: target, to: old) }
         try fm.moveItem(at: stage, to: target)
         try? fm.removeItem(at: old)
+    }
+
+    /// 54 MB 的下載偶爾會被斷線（2026/11/11 自我測試遇過「網路連線中斷」），網路錯誤最多試三次。
+    private static func retrying<T>(_ body: () async throws -> T) async throws -> T {
+        for attempt in 1... {
+            do {
+                return try await body()
+            } catch let error as URLError where attempt < 3 && error.code != .cancelled {
+                try await Task.sleep(for: .seconds(2 * attempt))
+            }
+        }
+        fatalError()
     }
 
     @discardableResult
