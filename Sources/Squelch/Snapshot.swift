@@ -20,7 +20,10 @@ enum Snapshot {
             player.segments = [SkipSegment(start: 101, end: 195, category: "sponsor")]
             player.isPlaying = true
         }
-        let size = panelOnly ? NSSize(width: 320, height: 820) : NSSize(width: 1280, height: 800)
+        // `--width 900`：看窄視窗的排版（主視窗最小 900 寬）。
+        let width = CommandLine.arguments.firstIndex(of: "--width").flatMap {
+            $0 + 1 < CommandLine.arguments.count ? Double(CommandLine.arguments[$0 + 1]) : nil } ?? 1280
+        let size = panelOnly ? NSSize(width: 320, height: 820) : NSSize(width: width, height: 800)
         let root: AnyView = panelOnly
             ? AnyView(PlayerPanel().background(Color(nsColor: .windowBackgroundColor)))
             : AnyView(ContentView(initialSelection: item))

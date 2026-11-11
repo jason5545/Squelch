@@ -78,7 +78,8 @@ struct ContentView: View {
             }
         }
         // 按 Enter 才搜尋，打字當下不查，免得一直呼叫 yt-dlp。
-        .searchable(text: $searchText, placement: .toolbar, prompt: "搜尋 YouTube")
+        // 放在側欄上方（像 Apple Music）：放工具列時會被排到最右邊，橫跨整個「正在播放」面板。
+        .searchable(text: $searchText, placement: .sidebar, prompt: "搜尋 YouTube")
         .onSubmit(of: .search) {
             selection = .search
             Task { await library.search(searchText) }
@@ -332,25 +333,15 @@ struct EpisodeList: View {
 
     private func header(_ episodes: [Episode]) -> some View {
         VStack(alignment: .leading, spacing: 22) {
-            HStack(alignment: .bottom, spacing: 24) {
-                cover
-                    .frame(width: 168, height: 168)
-                    .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(channel == nil ? "清單" : "頻道")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.white.opacity(0.85))
-                    Text(headerTitle)
-                        .font(.system(size: 54, weight: .black))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.4)
-                        .foregroundStyle(.white)
-                    Text(subtitle(episodes))
-                        .font(.callout)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .lineLimit(2)
+            // 中間這欄夠寬就用大封面；視窗窄、兩側都開著時改小封面，副標題才不會被擠成兩行。
+            ViewThatFits(in: .horizontal) {
+                headline(episodes, cover: 168, title: 54)
+                headline(episodes, cover: 96, title: 34)
+                VStack(alignment: .leading, spacing: 14) {
+                    cover.frame(width: 96, height: 96)
+                        .shadow(color: .black.opacity(0.5), radius: 16, y: 8)
+                    headlineText(episodes, title: 34)
                 }
-                .padding(.bottom, 4)
             }
             HStack(spacing: 20) {
                 if let target = playTarget(episodes) {
@@ -380,6 +371,33 @@ struct EpisodeList: View {
         .padding(.horizontal, 28)
         .padding(.top, 28)
         .padding(.bottom, 10)
+    }
+
+    private func headline(_ episodes: [Episode], cover size: CGFloat, title: CGFloat) -> some View {
+        HStack(alignment: .bottom, spacing: size > 100 ? 24 : 16) {
+            cover
+                .frame(width: size, height: size)
+                .shadow(color: .black.opacity(0.5), radius: size / 7, y: size / 14)
+            headlineText(episodes, title: title)
+                .padding(.bottom, 4)
+        }
+    }
+
+    private func headlineText(_ episodes: [Episode], title size: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(channel == nil ? "清單" : "頻道")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white.opacity(0.85))
+            Text(headerTitle)
+                .font(.system(size: size, weight: .black))
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .foregroundStyle(.white)
+            Text(subtitle(episodes))
+                .font(.callout)
+                .foregroundStyle(.white.opacity(0.7))
+                .lineLimit(2)
+        }
     }
 
     @ViewBuilder private var cover: some View {
@@ -454,7 +472,7 @@ struct EpisodeList: View {
                 ContentUnavailableView.search(text: library.searchQuery)
             } else {
                 ContentUnavailableView("搜尋 YouTube", systemImage: "magnifyingglass",
-                                       description: Text("在右上角的搜尋框輸入關鍵字，按 Enter。"))
+                                       description: Text("在側欄上方的搜尋框輸入關鍵字，按 Enter。"))
             }
         case .history:
             if library.historyLoading {

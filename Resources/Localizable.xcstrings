@@ -1110,30 +1110,30 @@
         }
       }
     },
-    "在右上角的搜尋框輸入關鍵字，按 Enter。": {
+    "在側欄上方的搜尋框輸入關鍵字，按 Enter。": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Type in the search field at the top right and press Return."
+            "value": "Type in the search field at the top of the sidebar and press Return."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "右上の検索欄にキーワードを入力して Return キーを押してください。"
+            "value": "サイドバー上部の検索欄にキーワードを入力して Return キーを押してください。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在右上角的搜索框输入关键字，按回车。"
+            "value": "在侧栏上方的搜索框输入关键字，按回车。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在右上角的搜尋框輸入關鍵字，按 Enter。"
+            "value": "在側欄上方的搜尋框輸入關鍵字，按 Enter。"
           }
         }
       }
