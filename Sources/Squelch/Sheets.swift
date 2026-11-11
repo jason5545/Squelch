@@ -130,6 +130,18 @@ struct SettingsView: View {
 Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次，以及把播放紀錄回報給 YouTube（每部影片約 10 次）。自動更新、解析音軌、搜尋都不帶帳號。yt-dlp 官方提醒，帳號搭配 yt-dlp 有被封鎖的風險。")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("直播狀態") {
+                if library.channels.isEmpty {
+                    Text("先加入頻道。").foregroundStyle(.secondary)
+                }
+                ForEach(library.channels) { channel in
+                    Toggle(channel.title, isOn: Binding(
+                        get: { channel.watchLive == true },
+                        set: { library.setWatchLive(channel.id, $0) }))
+                }
+                Text("勾選的頻道在按重新整理時檢查有沒有在直播（不帶帳號），沒按就顯示上次的結果。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("yt-dlp") {
                 LabeledContent("使用中", value: YTDLP.binaryPath().map { "\($0)  \(version ?? "")" } ?? "找不到")
                 TextField("自訂路徑（留空自動找 Homebrew）", text: $customPath)

@@ -12,6 +12,10 @@ final class Library {
     var finished: Set<String> = []
     var queue: [String] = []
     var subscriptionFeed: [String] = []
+    /// 勾選頻道的直播檢查結果。只在按重新整理時更新，平常顯示快取。
+    var liveFeed: [String] = []
+    var liveChecked: Date?
+    var checkingLive = false
     // 搜尋結果和觀看記錄只放在記憶體，不存檔；按播放時才記進 `episodes`。
     var searchQuery = ""
     var searchResults: [Episode] = []
@@ -36,6 +40,8 @@ final class Library {
         var finished: [String]
         var queue: [String]
         var subscriptionFeed: [String]?
+        var liveFeed: [String]?
+        var liveChecked: Date?
         var lastRefresh: Date?
     }
 
@@ -67,6 +73,8 @@ final class Library {
         finished = Set(snap.finished)
         queue = snap.queue.filter { episodes[$0] != nil }
         subscriptionFeed = (snap.subscriptionFeed ?? []).filter { episodes[$0] != nil }
+        liveFeed = (snap.liveFeed ?? []).filter { episodes[$0] != nil }
+        liveChecked = snap.liveChecked
         lastRefresh = snap.lastRefresh
         return true
     }
@@ -74,7 +82,8 @@ final class Library {
     func save() {
         let snap = Snapshot(channels: channels, episodes: Array(episodes.values), progress: progress,
                             lastPlayed: lastPlayed, finished: Array(finished).sorted(), queue: queue,
-                            subscriptionFeed: subscriptionFeed, lastRefresh: lastRefresh)
+                            subscriptionFeed: subscriptionFeed, liveFeed: liveFeed, liveChecked: liveChecked,
+                            lastRefresh: lastRefresh)
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
@@ -162,9 +171,50 @@ final class Library {
         }
     }
 
+    // MARK: 直播檢查（勾選的頻道、不帶帳號、只在按重新整理時跑）
+
+    var liveWatchChannels: [Channel] { channels.filter { $0.watchLive == true } }
+
+    func setWatchLive(_ id: String, _ on: Bool) {
+        guard let index = channels.firstIndex(where: { $0.id == id }) else { return }
+        channels[index].watchLive = on ? true : nil
+        if !on {
+            liveFeed.removeAll { episodes[$0]?.channelID == id }
+            applyLiveFlags()
+        }
+        save()
+    }
+
+    func checkLive() async {
+        let targets = liveWatchChannels.map(\.id)
+        guard !targets.isEmpty, !checkingLive else { return }
+        checkingLive = true
+        defer { checkingLive = false }
+        var found: [Episode] = []
+        await withTaskGroup(of: [Episode].self) { group in
+            for id in targets {
+                group.addTask {
+                    // 沒有直播分頁的頻道會回錯誤，當成沒在直播。
+                    let feed = try? await YTDLP.tab(channelID: id, path: "streams", limit: 3, isStream: true)
+                    return feed?.episodes.filter(\.liveNow) ?? []
+                }
+            }
+            for await lives in group { found += lives }
+        }
+        for ep in found {
+            var merged = ep
+            if let old = episodes[ep.id] { merged.published = old.published ?? ep.published }
+            episodes[ep.id] = merged
+        }
+        liveFeed = found.map(\.id)
+        liveChecked = Date()
+        applyLiveFlags()
+        save()
+    }
+
     /// 直播中的標記以最近一次抓到的為準，直播結束後不會一直標著。
     private func applyLiveFlags() {
-        let live = channelLive.union(subscriptionLive)
+        let live = channelLive.union(subscriptionLive).union(liveFeed)
         for (id, ep) in episodes where ep.liveNow != live.contains(id) {
             episodes[id]?.isLive = live.contains(id) ? true : nil
         }
@@ -186,7 +236,7 @@ final class Library {
 
     /// 每個頻道只留最新 80 部；聽到一半、待播、正在聽的不刪。
     private func prune() {
-        let keep = Set(queue).union(progress.keys).union(subscriptionFeed)
+        let keep = Set(queue).union(progress.keys).union(subscriptionFeed).union(liveFeed)
         let grouped = Dictionary(grouping: episodes.values, by: \.channelID)
         for (_, list) in grouped where list.count > 80 {
             for ep in list.sorted(by: Self.newestFirst).dropFirst(80) where !keep.contains(ep.id) {
@@ -354,6 +404,8 @@ final class Library {
         case .latest:
             return episodes.values.filter { ep in channels.contains { $0.id == ep.channelID } }
                 .sorted { a, b in a.liveNow != b.liveNow ? a.liveNow : Self.newestFirst(a, b) }
+        case .live:
+            return liveFeed.compactMap { episodes[$0] }
         case .search:
             return searchResults
         case .history:

@@ -88,6 +88,7 @@ enum SelfTest {
         await refreshAvoidsAccount(channel: channel)
         await accountChecks()
         await live()
+        await liveWatch()
         persistence(channel: channel)
         print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
         return failures == 0
@@ -253,6 +254,29 @@ enum SelfTest {
         player.pause()
         player.volume = 1
         try? FileManager.default.removeItem(at: YTDLP.cacheDirectory.appendingPathComponent("\(ep.id).m4a"))
+    }
+
+    /// 勾選頻道的直播檢查：按重新整理才查、不帶帳號；自動更新不動快取。
+    private static func liveWatch() async {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-livewatch-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let library = Library(directory: dir)
+        library.channels = [Channel(id: "https://www.youtube.com/@LofiGirl", title: "Lofi Girl", watchLive: true),
+                            Channel(id: "https://www.youtube.com/@AppleDeveloper", title: "Apple Developer")]
+        let before = YTDLP.accountCalls.load(ordering: .relaxed)
+        await library.checkLive()
+        let lives = library.list(for: .live)
+        check(!lives.isEmpty && lives.allSatisfy(\.liveNow) && library.liveChecked != nil,
+              "live check finds \(lives.count) live on the ticked channel")
+        check(lives.allSatisfy { $0.channelID.hasSuffix("@LofiGirl") }, "live check only looks at ticked channels")
+        check(YTDLP.accountCalls.load(ordering: .relaxed) == before, "live check makes no account requests")
+        let checked = library.liveChecked
+        await library.refresh()
+        check(library.liveChecked == checked && library.list(for: .live).map(\.id) == lives.map(\.id)
+              && library.list(for: .live).allSatisfy(\.liveNow), "auto refresh keeps cached live status")
+        let reloaded = Library(directory: dir)
+        check(reloaded.list(for: .live).map(\.id) == lives.map(\.id) && reloaded.channels.first?.watchLive == true,
+              "live status and ticks survive restart")
     }
 
     /// 24 小時直播的頻道，拿來測直播清單和直播播放。

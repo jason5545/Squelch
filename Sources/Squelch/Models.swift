@@ -6,6 +6,8 @@ nonisolated struct Channel: Codable, Identifiable, Hashable, Sendable {
     var title: String
     var avatar: URL?
     var includeStreams: Bool = false
+    /// 按重新整理時要不要檢查這個頻道有沒有在直播。舊資料沒有這個欄位，所以是 Optional。
+    var watchLive: Bool?
 }
 
 /// 一部影片，Squelch 只播它的音軌。
@@ -51,6 +53,7 @@ nonisolated struct ResolvedStream: Sendable {
 
 nonisolated enum SidebarItem: Hashable, Sendable {
     case latest
+    case live
     case search
     case history
     case subscriptions

@@ -48,12 +48,14 @@ struct ContentView: View {
                     .help("加入頻道")
                 Button {
                     Task {
+                        // 直播狀態只在按重新整理時查（勾選的頻道、不帶帳號），自動更新用快取。
+                        await library.checkLive()
                         if selection == .history { await library.loadHistory() }
                         if selection == .subscriptions { await library.loadSubscriptions(force: true) }
                         await library.refresh()
                     }
                 } label: {
-                    if library.refreshing || library.subscriptionsLoading || library.historyLoading {
+                    if library.refreshing || library.subscriptionsLoading || library.historyLoading || library.checkingLive {
                         ProgressView().controlSize(.small)
                     } else {
                         Label("重新整理", systemImage: "arrow.clockwise")
@@ -88,6 +90,8 @@ struct Sidebar: View {
     var body: some View {
         List(selection: $selection) {
             Label("最新", systemImage: "tray.full").tag(SidebarItem.latest)
+            Label("直播中", systemImage: "dot.radiowaves.left.and.right").tag(SidebarItem.live)
+                .badge(library.list(for: .live).count)
             Label("搜尋結果", systemImage: "magnifyingglass").tag(SidebarItem.search)
             // 0.2.0 這一列是登入後才插入、外面包 HStack，點了沒反應；改成一律顯示、跟其他列同樣的結構。
             Label("訂閱動態", systemImage: "person.2.wave.2").tag(SidebarItem.subscriptions)
@@ -128,6 +132,9 @@ struct ChannelRow: View {
             }
         }
         .contextMenu {
+            Toggle("按重新整理時檢查直播", isOn: Binding(
+                get: { channel.watchLive == true },
+                set: { library.setWatchLive(channel.id, $0) }))
             Toggle("包含直播回放", isOn: Binding(
                 get: { channel.includeStreams },
                 set: { library.setIncludeStreams(channel.id, $0) }))
@@ -212,6 +219,21 @@ struct EpisodeList: View {
                                    description: Text("在影片上按右鍵，選「加到待播清單」。"))
         case .inProgress:
             ContentUnavailableView("沒有聽到一半的", systemImage: "clock.arrow.circlepath")
+        case .live:
+            if library.liveWatchChannels.isEmpty {
+                ContentUnavailableView {
+                    Label("還沒有勾選要檢查直播的頻道", systemImage: "dot.radiowaves.left.and.right")
+                } description: {
+                    Text("在設定的「直播狀態」，或在側欄的頻道上按右鍵勾選。")
+                } actions: {
+                    SettingsLink { Text("打開設定") }
+                }
+            } else if library.checkingLive {
+                ProgressView("正在檢查直播…")
+            } else {
+                ContentUnavailableView("目前沒有在直播", systemImage: "dot.radiowaves.left.and.right",
+                                       description: Text(liveStatusText))
+            }
         case .search:
             if library.searching {
                 ProgressView("搜尋「\(library.searchQuery)」…")
@@ -258,9 +280,16 @@ struct EpisodeList: View {
         }
     }
 
+    private var liveStatusText: String {
+        let names = library.liveWatchChannels.map(\.title).joined(separator: "、")
+        guard let checked = library.liveChecked else { return "檢查：\(names)。按重新整理才會查。" }
+        return "檢查：\(names) · \(checked.formatted(date: .omitted, time: .shortened)) 查的，按重新整理才會再查"
+    }
+
     private var title: String {
         switch item {
         case .latest: "最新"
+        case .live: "直播中"
         case .search: library.searchQuery.isEmpty ? "搜尋結果" : "搜尋：\(library.searchQuery)"
         case .history: "觀看記錄"
         case .subscriptions: "訂閱動態"
@@ -275,6 +304,7 @@ struct EpisodeList: View {
         if item == .subscriptions, let fetched = library.subscriptionsFetched {
             return "\(episodes.count) 部 · \(fetched.formatted(date: .omitted, time: .shortened)) 更新，打開這裡或按重新整理才會再抓"
         }
+        if item == .live { return liveStatusText }
         if item == .history { return account.isLoggedIn ? "YouTube 觀看記錄（含手機）" : "Squelch 本機記錄" }
         if item == .search, library.searching { return "搜尋中…" }
         let total = episodes.reduce(0) { $0 + ($1.duration ?? 0) }
