@@ -4,7 +4,8 @@ import Foundation
 import MediaPlayer
 
 /// `Squelch.app/Contents/MacOS/Squelch --selftest`：不開視窗，實際連 YouTube 跑一次核心流程。
-/// 驗證：網址解析、頻道清單、HLS 與下載備援兩條播放路徑（長度、開播、跳到中段、2 倍速）、SponsorBlock 查詢、存檔。
+/// 驗證：網址解析、頻道清單、三條播放路徑（自己解碼的 HLS、AVPlayer 的 HLS、下載備援：長度、開播、跳到中段、倍速）、
+/// 音量放大、SponsorBlock 查詢、存檔。
 @MainActor
 enum SelfTest {
     private static var failures = 0
@@ -70,6 +71,8 @@ enum SelfTest {
                 let started = Date()
                 let stream = try await YTDLP.resolve(videoID: ep.id)
                 check(!stream.isLocal, "resolve HLS audio (\(String(format: "%.1f", Date().timeIntervalSince(started)))s)")
+                await decoding(stream)
+                await segments(stream, duration: ep.duration ?? 0)
                 await playback(stream, duration: ep.duration ?? 0, label: "HLS")
                 let dlStart = Date()
                 let local = try await YTDLP.download(videoID: ep.id)
@@ -80,6 +83,7 @@ enum SelfTest {
             } catch {
                 check(false, "resolve: \(error.localizedDescription)")
             }
+            await boostInline(ep)
             await boostSwitch(ep)
             let segments = await SponsorBlock.segments(videoID: ep.id, categories: ["sponsor", "selfpromo"])
             print("info  SponsorBlock segments: \(segments.map { "\($0.category) \(Format.time($0.start))–\(Format.time($0.end))" })")
@@ -224,33 +228,214 @@ enum SelfTest {
         }
     }
 
-    /// App 裡的實際流程：播 HLS 時把音量拉過 100%，應該在背景下載、從同一個位置切到本機檔。
+    private static func wait(_ limit: Double, until done: () -> Bool) async {
+        let start = Date()
+        while !done(), Date().timeIntervalSince(start) < limit { try? await Task.sleep(for: .milliseconds(100)) }
+    }
+
+    private static func fixed(_ value: Double) -> String { String(format: "%.1f", value) }
+
+    /// 播放清單、ADTS、解碼器：兩段連著解，取樣數要剛好是 frame 數 × 1024（沒有掉、沒有多），而且有聲音。
+    private static func decoding(_ stream: ResolvedStream) async {
+        do {
+            var request = URLRequest(url: stream.url)
+            for (field, value) in stream.headers { request.setValue(value, forHTTPHeaderField: field) }
+            let (text, _) = try await URLSession.shared.data(for: request)
+            let playlist = try SegmentPlaylist.parse(String(decoding: text, as: UTF8.self), baseURL: stream.url)
+            check(playlist.segments.count > 10 && playlist.index(at: 0) == 0
+                  && playlist.index(at: playlist.duration + 5) == playlist.segments.count - 1
+                  && playlist.index(at: playlist.segments[3].start + 0.01) == 3,
+                  "segments: playlist has \(playlist.segments.count) segments, \(Format.time(playlist.duration))")
+            var decoder: SegmentDecoder?
+            var frames = 0, samples = 0, energy = 0.0, peak: Float = 0
+            for segment in playlist.segments[5..<7] {
+                var request = URLRequest(url: segment.url)
+                for (field, value) in stream.headers { request.setValue(value, forHTTPHeaderField: field) }
+                let (data, _) = try await URLSession.shared.data(for: request)
+                guard let parsed = ADTS.parse(data) else {
+                    check(false, "segments: segment is ADTS AAC")
+                    return
+                }
+                if decoder == nil { decoder = SegmentDecoder(format: parsed.format) }
+                guard let decoder else {
+                    check(false, "segments: decoder for \(parsed.format)")
+                    return
+                }
+                let pcm = decoder.decode(data, packets: parsed.packets)
+                frames += parsed.packets.count
+                samples += pcm.count / parsed.format.channels
+                for x in pcm {
+                    energy += Double(x * x)
+                    peak = max(peak, abs(x))
+                }
+            }
+            let rms = (energy / Double(max(1, samples * 2))).squareRoot()
+            check(samples == frames * 1024, "segments: decoded \(frames) AAC frames into \(samples) samples, no gaps")
+            check(rms > 0.0005 && peak <= 1.5, "segments: decoded audio is not silent (rms \(String(format: "%.4f", rms)), peak \(String(format: "%.2f", peak)))")
+        } catch {
+            check(false, "segments: \(error.localizedDescription)")
+        }
+        check(ADTS.parse(Data([0x47, 0x40, 0x00, 0x10, 0, 0, 0, 0, 0, 0])) == nil, "segments: MPEG-TS is rejected")
+        let live = "#EXTM3U\n#EXT-X-TARGETDURATION:5\n#EXTINF:5.0,\na.aac\n"
+        check((try? SegmentPlaylist.parse(live, baseURL: stream.url)) == nil
+              && (try? SegmentPlaylist.parse(live + "#EXT-X-ENDLIST\n", baseURL: stream.url))?.segments.count == 1,
+              "segments: playlist without an end (live) is rejected")
+    }
+
+    /// 自己解碼的 HLS：長度、開播、跳轉、2 倍和 3 倍速、放大不中斷、暫停、播到結尾。全程不出聲。
+    private static func segments(_ stream: ResolvedStream, duration: Double) async {
+        let engine = SegmentPlayer(stream: stream)
+        engine.silent = true
+        var length: Double?
+        var failure: String?
+        var finished = false
+        engine.onReady = { length = $0 }
+        engine.onFailed = { message, _ in failure = message }
+        engine.onFinished = { finished = true }
+        defer { engine.stop() }
+
+        let started = Date()
+        engine.load(at: 0)
+        await wait(20) { length != nil || failure != nil }
+        check(length != nil, "segments: ready in \(fixed(Date().timeIntervalSince(started)))s \(failure ?? "")")
+        guard let length else { return }
+        if duration > 0 {
+            check(abs(length - duration) < 3, "segments: duration \(Format.time(length)) matches \(Format.time(duration))")
+        }
+
+        engine.play()
+        let playStart = Date()
+        await wait(15) { engine.currentTime > 0.5 }
+        print("info  segments: first audio \(fixed(Date().timeIntervalSince(playStart)))s after ready")
+        try? await Task.sleep(for: .seconds(2))
+        check(engine.currentTime > 1.5, "segments: plays from start: t=\(fixed(engine.currentTime))")
+
+        let middle = length / 2
+        engine.rate = 2
+        let seekStart = Date()
+        engine.seek(to: middle)
+        await wait(10) { engine.currentTime > middle + 0.2 }
+        let seekDelay = Date().timeIntervalSince(seekStart)
+        let from = engine.currentTime
+        try? await Task.sleep(for: .seconds(3))
+        var advanced = engine.currentTime - from
+        check(seekDelay < 3 && advanced > 5 && advanced < 7,
+              "segments: seek to \(Format.time(middle)) at 2×: audio after \(fixed(seekDelay))s, advanced \(fixed(advanced))s in 3s")
+        if advanced <= 5 { print("info  segments: \(engine.debugState)") }
+
+        // 往前跳 30 秒：分段已經先抓好了，不用等網路。
+        let skipTo = engine.currentTime + 30
+        let skipStart = Date()
+        engine.seek(to: skipTo)
+        await wait(5) { engine.currentTime > skipTo + 0.2 }
+        let skipDelay = Date().timeIntervalSince(skipStart)
+        check(skipDelay < 1, "segments: skip ahead 30s inside the fetched range: audio after \(String(format: "%.2f", skipDelay))s")
+
+        // 放大：只換掉還沒播的音訊，不重新開始，位置照常前進。
+        let before = engine.stats
+        var at = engine.currentTime
+        engine.volume = 1.6
+        try? await Task.sleep(for: .seconds(2))
+        advanced = engine.currentTime - at
+        let after = engine.stats
+        check(abs(engine.gain - 1.6) < 0.001 && after.rebakes == before.rebakes + 1 && after.restarts == before.restarts
+              && after.rebakeFallbacks == before.rebakeFallbacks && advanced > 3.5 && advanced < 4.5,
+              "segments: boost to 160% swaps queued audio without restarting (rebakes \(after.rebakes), fallbacks \(after.rebakeFallbacks), advanced \(fixed(advanced))s in 2s)")
+        check(abs(engine.playingGain - 1.6) < 0.001 && abs(engine.effectiveVolume - 1.6) < 0.001,
+              "segments: boosted audio is playing 2s later (×\(fixed(Double(engine.effectiveVolume))))")
+        // 往下調：舊增益的音訊還在播，先用 renderer 的音量補，立刻生效；之後換成沒放大的音訊。
+        engine.volume = 0.5
+        check(engine.gain == 1 && abs(engine.playingGain - 1.6) < 0.001 && abs(engine.effectiveVolume - 0.5) < 0.001,
+              "segments: turning down takes effect at once (×\(fixed(Double(engine.effectiveVolume))) while ×\(fixed(Double(engine.playingGain))) audio is still queued)")
+        try? await Task.sleep(for: .seconds(2))
+        check(engine.playingGain == 1 && abs(engine.effectiveVolume - 0.5) < 0.001 && engine.stats.restarts == before.restarts
+              && engine.stats.rebakeFallbacks == before.rebakeFallbacks,
+              "segments: unboosted audio takes over, still 50% (playing ×\(fixed(Double(engine.playingGain))), restarts \(engine.stats.restarts - before.restarts), fallbacks \(engine.stats.rebakeFallbacks - before.rebakeFallbacks), rebakes \(engine.stats.rebakes - before.rebakes))")
+        engine.volume = 1
+
+        engine.rate = 3
+        at = engine.currentTime
+        try? await Task.sleep(for: .seconds(2))
+        advanced = engine.currentTime - at
+        check(advanced > 5 && advanced < 7, "segments: 3× advanced \(fixed(advanced))s in 2s")
+
+        engine.pause()
+        at = engine.currentTime
+        try? await Task.sleep(for: .seconds(1))
+        check(abs(engine.currentTime - at) < 0.05, "segments: pause holds position")
+
+        engine.seek(to: length - 5)
+        engine.play()
+        await wait(10) { finished }
+        check(finished && engine.stats.underruns == 0,
+              "segments: plays to the end and reports finished (underruns \(engine.stats.underruns), fetched \(engine.stats.segmentsFetched) segments)")
+    }
+
+    /// App 裡的實際流程：HLS 由 `SegmentPlayer` 播，音量拉過 100% 直接放大，不下載、不切換。
+    private static func boostInline(_ ep: Episode) async {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-inline-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let savedVolume = UserDefaults.standard.object(forKey: "volume")
+        defer { UserDefaults.standard.set(savedVolume, forKey: "volume") }
+        try? FileManager.default.removeItem(at: YTDLP.cacheDirectory.appendingPathComponent("\(ep.id).m4a"))
+
+        // 自我測試跟裝好的 App 共用偏好設定，動過的要還原。
+        let savedRate = UserDefaults.standard.object(forKey: "rate")
+        defer { UserDefaults.standard.set(savedRate, forKey: "rate") }
+
+        let player = Player(library: Library(directory: dir))
+        player.silent = true
+        player.volume = 1
+        player.rate = 1
+        player.play(ep)
+        await wait(20) { player.isPlaying && player.position > 2 }
+        check(player.isPlaying && player.segmentPlayer != nil && player.canBoost && player.avPlayer.currentItem == nil,
+              "player decodes HLS itself and can boost right away")
+        check(abs(player.duration - (ep.duration ?? 0)) < 3, "player duration \(Format.time(player.duration))")
+        player.seek(to: 300)
+        await wait(5) { player.position > 301 }
+        player.volume = 1.6
+        try? await Task.sleep(for: .seconds(2))
+        check(!player.boostPending && !player.isLocalPlayback && player.isPlaying && !player.isLoading,
+              "volume above 100% needs no download and no switch")
+        check(abs((player.segmentPlayer?.gain ?? 0) - 1.6) < 0.001 && player.position > 302 && player.position < 310,
+              "boost applied in place, position kept: \(Format.time(player.position))")
+        player.pause()
+        let paused = player.position
+        try? await Task.sleep(for: .seconds(1))
+        check(!player.isPlaying && abs((player.segmentPlayer?.currentTime ?? 0) - paused) < 0.6, "player pause stops the audio clock")
+        player.toggle()
+        await wait(5) { player.position > paused + 1 }
+        check(player.isPlaying && player.position > paused + 1, "player resumes from the same spot")
+        player.pause()
+        player.volume = 1
+    }
+
+    /// 備援：`SegmentPlayer` 解不了、HLS 交給 AVPlayer 播的時候，音量拉過 100% 要在背景下載、從同一個位置切到本機檔。
     private static func boostSwitch(_ ep: Episode) async {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-boost-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: dir) }
         let savedVolume = UserDefaults.standard.object(forKey: "volume")
         defer { UserDefaults.standard.set(savedVolume, forKey: "volume") }
         try? FileManager.default.removeItem(at: YTDLP.cacheDirectory.appendingPathComponent("\(ep.id).m4a"))
+        Player.useSegments = false
+        defer { Player.useSegments = true }
 
         let player = Player(library: Library(directory: dir))
+        player.silent = true
         player.volume = 1
-        player.avPlayer.isMuted = true
         player.play(ep)
-        func wait(_ limit: Double, until done: () -> Bool) async {
-            let start = Date()
-            while !done(), Date().timeIntervalSince(start) < limit { try? await Task.sleep(for: .milliseconds(100)) }
-        }
         await wait(20) { player.isPlaying && player.position > 2 }
-        check(player.isPlaying && !player.isLocalPlayback, "player starts on HLS at 100%")
+        check(player.isPlaying && !player.isLocalPlayback && player.segmentPlayer == nil, "fallback: player starts on AVPlayer HLS at 100%")
         player.seek(to: 300)
         await wait(5) { player.position > 301 }
         player.volume = 1.6
-        check(player.boostPending, "volume above 100% starts preparing boost")
+        check(player.boostPending, "fallback: volume above 100% starts preparing boost")
         await wait(30) { player.isLocalPlayback && player.isPlaying && !player.isLoading && player.position > 300 }
-        check(player.isLocalPlayback && player.isPlaying, "switched to local file and kept playing")
+        check(player.isLocalPlayback && player.isPlaying, "fallback: switched to local file and kept playing")
         check(player.position > 300 && player.position < 330,
-              "kept position across the switch: \(Format.time(player.position))")
-        check(abs(Boost.gain - 1.6) < 0.001 && player.avPlayer.volume == 1, "gain 1.6 with player volume capped at 1.0")
+              "fallback: kept position across the switch: \(Format.time(player.position))")
+        check(abs(Boost.gain - 1.6) < 0.001 && player.avPlayer.volume == 1, "fallback: gain 1.6 with player volume capped at 1.0")
         player.pause()
         player.volume = 1
         try? FileManager.default.removeItem(at: YTDLP.cacheDirectory.appendingPathComponent("\(ep.id).m4a"))

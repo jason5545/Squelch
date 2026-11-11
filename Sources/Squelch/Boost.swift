@@ -21,18 +21,17 @@ nonisolated enum Boost {
 
     static let knee: Float = 0.85
 
+    /// 柔性限幅：`knee` 以下原樣，以上用 tanh 壓到不超過 1.0。
+    @inline(__always) static func shape(_ y: Float) -> Float {
+        let a = abs(y)
+        guard a > knee else { return y }
+        let shaped = knee + (1 - knee) * tanhf((a - knee) / (1 - knee))
+        return y < 0 ? -shaped : shaped
+    }
+
     static func process(_ samples: UnsafeMutablePointer<Float>, count: Int, gain: Float) {
         guard gain > 1.0001 else { return }
-        for i in 0..<count {
-            let y = samples[i] * gain
-            let a = abs(y)
-            if a > knee {
-                let shaped = knee + (1 - knee) * tanhf((a - knee) / (1 - knee))
-                samples[i] = y < 0 ? -shaped : shaped
-            } else {
-                samples[i] = y
-            }
-        }
+        for i in 0..<count { samples[i] = shape(samples[i] * gain) }
     }
 
     /// 給本機檔的 AVPlayerItem 用的 audioMix。增益隨時讀 `Boost.gain`，改音量不用重建。

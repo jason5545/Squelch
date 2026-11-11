@@ -16,7 +16,7 @@ final class Player {
     var notice: String?
     var segments: [SkipSegment] = []
     var isLive = false
-    /// 0～2。超過 1 的部分由 `Boost` 放大，只對本機檔有效。
+    /// 0～2。超過 1 的部分是放大：HLS 由 `SegmentPlayer` 在解碼後乘上去，本機檔由 `Boost` 的 tap 做。
     var volume: Float {
         didSet {
             UserDefaults.standard.set(volume, forKey: "volume")
@@ -27,12 +27,25 @@ final class Player {
     /// 拉超過 100%、正在下載本機檔準備放大。
     var boostPending = false
     var isLocalPlayback = false
+    /// 現在的播放方式能放大：自己解碼的 HLS，或本機檔。
+    var canBoost = false
+    /// 關掉就全部交給 AVPlayer（0.6 以前的做法，現在是備援）。自我測試用它來測備援那條路。
+    static var useSegments = true
+    /// 自我測試用：不出聲，其他照常。
+    @ObservationIgnored var silent = false {
+        didSet { applyVolume() }
+    }
+    /// 不是 nil 時由它出聲，AVPlayer 沒有東西在播。
+    @ObservationIgnored private(set) var segmentPlayer: SegmentPlayer?
+    /// 這一集的 HLS 不是 `SegmentPlayer` 會解的格式，改用 AVPlayer。
+    @ObservationIgnored private var segmentsUnsupported = false
     @ObservationIgnored private var volumeBeforeMute: Float = 1
     @ObservationIgnored private var boostTask: Task<Void, Never>?
     var rate: Float {
         didSet {
             UserDefaults.standard.set(rate, forKey: "rate")
-            if isPlaying && !isLive { avPlayer.rate = rate }
+            segmentPlayer?.rate = rate
+            if isPlaying && !isLive && segmentPlayer == nil { avPlayer.rate = rate }
             nowPlaying.update()
         }
     }
@@ -68,7 +81,10 @@ final class Player {
         avPlayer.automaticallyWaitsToMinimizeStalling = true
         timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 2), queue: .main) { [weak self] time in
             let seconds = time.seconds
-            MainActor.assumeIsolated { self?.tick(seconds) }
+            MainActor.assumeIsolated {
+                guard let self, self.segmentPlayer == nil else { return }
+                self.tick(seconds)
+            }
         }
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification,
                                                              object: nil, queue: .main) { [weak self] note in
@@ -83,7 +99,10 @@ final class Player {
         // KVO、seek 完成的回呼可能在背景執行緒，closure 一律 @Sendable，再切回主執行緒。
         controlObservation = avPlayer.observe(\.timeControlStatus) { @Sendable [weak self] player, _ in
             let waiting = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
-            Task { @MainActor in self?.isBuffering = waiting }
+            Task { @MainActor in
+                guard let self, self.segmentPlayer == nil else { return }
+                self.isBuffering = waiting
+            }
         }
         nowPlaying.attach(self)
         applyVolume()
@@ -97,7 +116,7 @@ final class Player {
     /// 跳轉後偶爾會出現「狀態是播放中、速度正常、沒有在等緩衝，但時間不走」（自我測試大約每六次一次，
     /// 2026/11/11 抓到 rate=2 tcs=playing reason=nil，時間停在跳轉的位置）。時間 2.5 秒沒前進就在原位輕推一下。
     private func checkStall() {
-        guard isPlaying, !isLoading, !isLive, avPlayer.timeControlStatus == .playing else {
+        guard isPlaying, !isLoading, !isLive, segmentPlayer == nil, avPlayer.timeControlStatus == .playing else {
             stalledSince = nil
             return
         }
@@ -128,7 +147,10 @@ final class Player {
 
     private func applyVolume() {
         avPlayer.volume = min(volume, 1)
+        avPlayer.isMuted = silent
         Boost.gain = volume
+        segmentPlayer?.silent = silent
+        segmentPlayer?.volume = volume
     }
 
     func toggleMute() {
@@ -144,9 +166,10 @@ final class Player {
         volume = max(0, min(2, (volume + delta) * 10).rounded() / 10)
     }
 
-    /// 放大只能用在本機檔。正在播 HLS 時，背景下載音軌，下載好就從同一個位置切過去。
+    /// 備援：HLS 交給 AVPlayer 播的時候（`SegmentPlayer` 解不了這個格式）沒辦法放大，
+    /// 所以背景下載音軌，下載好就從同一個位置切到本機檔。
     private func prepareBoost() {
-        guard let ep = current, !isLocalPlayback, !isLive, boostTask == nil else { return }
+        guard let ep = current, !canBoost, !isLive, boostTask == nil else { return }
         boostPending = true
         boostTask = Task {
             defer { boostTask = nil; boostPending = false }
@@ -178,6 +201,8 @@ final class Player {
         boostPending = false
         pendingPause = false
         isLocalPlayback = false
+        canBoost = false
+        segmentsUnsupported = false
         let token = UUID()
         loadToken = token
         library.remember(ep)
@@ -247,10 +272,15 @@ final class Player {
 
     private func start(_ stream: ResolvedStream, at seconds: Double) {
         teardownItem()
+        isLocalPlayback = stream.isLocal
+        if Self.useSegments, !segmentsUnsupported, !stream.isLocal, !stream.isLive, !isLive {
+            startSegments(stream, at: seconds)
+            return
+        }
+        canBoost = stream.isLocal
         let asset = Self.makeAsset(stream)
         let item = AVPlayerItem(asset: asset)
         item.audioTimePitchAlgorithm = .timeDomain
-        isLocalPlayback = stream.isLocal
         if stream.isLocal {
             Task {
                 guard let track = try? await asset.loadTracks(withMediaType: .audio).first else { return }
@@ -273,7 +303,55 @@ final class Player {
             : AVURLAsset(url: stream.url, options: ["AVURLAssetHTTPHeaderFieldsKey": stream.headers])
     }
 
+    /// HLS 純音訊：自己抓分段、解碼、放大（見 `SegmentPlayer`）。開播位置直接交給它，不用等就緒再跳。
+    private func startSegments(_ stream: ResolvedStream, at seconds: Double) {
+        let engine = SegmentPlayer(stream: stream)
+        engine.silent = silent
+        engine.volume = volume
+        engine.rate = rate
+        engine.onReady = { [weak self, weak engine] length in
+            guard let self, let engine, self.segmentPlayer === engine, self.isLoading else { return }
+            self.isLoading = false
+            if length > 0 { self.duration = length }
+            if let target = self.pendingSeek {
+                self.pendingSeek = nil
+                engine.seek(to: target)
+            }
+            self.beginPlayback()
+        }
+        engine.onTick = { [weak self, weak engine] seconds in
+            guard let self, self.segmentPlayer === engine else { return }
+            // 有在前進就代表網址是好的，下次失敗可以再重新解析一次。
+            if self.isPlaying, seconds > self.position { self.retried = false }
+            self.tick(seconds)
+        }
+        engine.onBuffering = { [weak self, weak engine] waiting in
+            guard let self, self.segmentPlayer === engine else { return }
+            self.isBuffering = waiting
+        }
+        engine.onFinished = { [weak self, weak engine] in
+            guard let self, self.segmentPlayer === engine else { return }
+            self.didFinish()
+        }
+        engine.onFailed = { [weak self, weak engine] message, unsupported in
+            guard let self, self.segmentPlayer === engine else { return }
+            if unsupported {
+                // 不是 ADTS 分段（例如哪天 YouTube 改格式）：這一集改用 AVPlayer。
+                self.segmentsUnsupported = true
+                self.start(stream, at: self.position)
+            } else {
+                self.playbackFailed(message)
+            }
+        }
+        pendingSeek = nil
+        canBoost = true
+        segmentPlayer = engine
+        engine.load(at: seconds)
+    }
+
     private func teardownItem() {
+        segmentPlayer?.stop()
+        segmentPlayer = nil
         statusObservation = nil
         avPlayer.pause()
         avPlayer.replaceCurrentItem(with: nil)
@@ -294,31 +372,53 @@ final class Player {
                 beginPlayback()
             }
         case .failed:
-            // 最常見的原因是網址過期：重新解析一次，從原本的位置接著播。
-            guard let ep = current else { return }
-            if !retried {
-                retried = true
-                let token = loadToken
-                let at = position
-                isLoading = true
-                Task {
-                    do {
-                        let stream = try await stream(for: ep.id, fresh: true)
-                        guard token == loadToken else { return }
-                        start(stream, at: at)
-                    } catch {
-                        guard token == loadToken else { return }
-                        isLoading = false
-                        errorMessage = error.localizedDescription
-                    }
-                }
-            } else {
-                isLoading = false
-                isPlaying = false
-                errorMessage = message ?? String(localized: "播放失敗")
-            }
+            playbackFailed(message)
         default:
             break
+        }
+    }
+
+    /// 最常見的原因是網址過期：重新解析一次，從原本的位置接著播。
+    private func playbackFailed(_ message: String?) {
+        guard let ep = current else { return }
+        if !retried {
+            retried = true
+            let token = loadToken
+            let at = position
+            isLoading = true
+            Task {
+                do {
+                    let stream = try await stream(for: ep.id, fresh: true)
+                    guard token == loadToken else { return }
+                    start(stream, at: at)
+                } catch {
+                    guard token == loadToken else { return }
+                    isLoading = false
+                    errorMessage = error.localizedDescription
+                }
+            }
+        } else {
+            teardownItem()
+            isLoading = false
+            isPlaying = false
+            errorMessage = message ?? String(localized: "播放失敗")
+        }
+    }
+
+    private func engineSeek(_ seconds: Double) {
+        if let segmentPlayer {
+            segmentPlayer.seek(to: seconds)
+        } else {
+            avPlayer.seek(to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        }
+    }
+
+    private func enginePlay() {
+        if let segmentPlayer {
+            segmentPlayer.rate = rate
+            segmentPlayer.play()
+        } else {
+            avPlayer.playImmediately(atRate: isLive ? 1 : rate)
         }
     }
 
@@ -330,7 +430,7 @@ final class Player {
             nowPlaying.update()
             return
         }
-        avPlayer.playImmediately(atRate: isLive ? 1 : rate)
+        enginePlay()
         isPlaying = true
         if volume > 1 { prepareBoost() }
         if let ep = current, !historyStarted {
@@ -361,10 +461,10 @@ final class Player {
         guard let ep = current else { return }
         if isPlaying {
             pause()
-        } else if avPlayer.currentItem == nil {
+        } else if avPlayer.currentItem == nil && segmentPlayer == nil {
             play(ep)
         } else {
-            avPlayer.playImmediately(atRate: isLive ? 1 : rate)
+            enginePlay()
             isPlaying = true
             history?.resumed(at: position)
             nowPlaying.update()
@@ -378,6 +478,7 @@ final class Player {
     func pause() {
         guard isPlaying else { return }
         avPlayer.pause()
+        segmentPlayer?.pause()
         isPlaying = false
         history?.paused(at: position)
         saveProgress(force: true)
@@ -397,7 +498,7 @@ final class Player {
         if isLoading {
             pendingSeek = target
         } else {
-            avPlayer.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+            engineSeek(target)
         }
         // 往回拉到跳過片段之前，再經過時要重新跳。
         skipped = skipped.filter { $0.start < target }
@@ -423,7 +524,7 @@ final class Player {
         if isPlaying, !isLive, let seg = segments.first(where: { seconds >= $0.start && seconds < $0.end - 0.5 && !skipped.contains($0) }) {
             skipped.insert(seg)
             history?.seeked(from: seconds, to: seg.end)
-            avPlayer.seek(to: CMTime(seconds: seg.end, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+            engineSeek(seg.end)
             position = seg.end
             show(String(localized: "已跳過\(seg.label) \(Format.time(seg.end - seg.start))"))
             nowPlaying.update()
