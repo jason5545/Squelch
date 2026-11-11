@@ -18,7 +18,10 @@ nonisolated struct Episode: Codable, Identifiable, Hashable, Sendable {
     /// yt-dlp 從「2 天前」換算的大約時間，只拿來排序。
     var published: Date?
     var isStream: Bool = false
+    /// 正在直播。舊的 library.json 沒有這個欄位，所以是 Optional。
+    var isLive: Bool?
 
+    var liveNow: Bool { isLive == true }
     var watchURL: URL { URL(string: "https://www.youtube.com/watch?v=\(id)")! }
     var thumbnail: URL { URL(string: "https://i.ytimg.com/vi/\(id)/mqdefault.jpg")! }
 }
@@ -39,6 +42,7 @@ nonisolated struct ResolvedStream: Sendable {
     var channelTitle: String
     var channelID: String?
     var expires: Date
+    var isLive = false
 
     var isFresh: Bool {
         isLocal ? FileManager.default.fileExists(atPath: url.path) : expires.timeIntervalSinceNow > 15 * 60
@@ -47,6 +51,7 @@ nonisolated struct ResolvedStream: Sendable {
 
 nonisolated enum SidebarItem: Hashable, Sendable {
     case latest
+    case subscriptions
     case inProgress
     case queue
     case channel(String)

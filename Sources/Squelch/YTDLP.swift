@@ -28,7 +28,8 @@ nonisolated enum YTDLP {
     }
 
     /// 執行 yt-dlp 並回傳 stdout。stdout 和 stderr 同時讀，避免輸出太大把管線塞住。
-    static func run(_ arguments: [String]) async throws -> Data {
+    static func run(_ arguments: [String], cookies: URL? = nil) async throws -> Data {
+        let arguments = cookies.map { ["--cookies", $0.path] + arguments } ?? arguments
         guard let path = binaryPath() else { throw YTDLPError.notFound }
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -104,16 +105,41 @@ nonisolated enum YTDLP {
         for entry in obj["entries"] as? [[String: Any]] ?? [] {
             guard let id = entry["id"] as? String, let name = entry["title"] as? String else { continue }
             let live = entry["live_status"] as? String
-            if live == "is_live" || live == "is_upcoming" { continue }
+            if live == "is_upcoming" { continue }
+            let isLive = live == "is_live"
             let duration = (entry["duration"] as? NSNumber)?.doubleValue
-            if isStream && duration == nil { continue }
+            if isStream && duration == nil && !isLive { continue }
             // 估計時間只到「幾天前」，同一天的會撞在一起；減掉在清單裡的位置秒數，保留頻道頁的先後順序。
             let position = Double(episodes.count)
             let published = (entry["timestamp"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue - position) }
-            episodes.append(Episode(id: id, title: name, channelID: channelID, channelTitle: title,
-                                    duration: duration, published: published, isStream: isStream))
+            // 訂閱動態混了很多頻道，頻道資訊要從每一筆拿。
+            var epChannelID = channelID, epChannelTitle = title
+            if channelID == subscriptionsURL {
+                if let handle = entry["uploader_id"] as? String, handle.hasPrefix("@") {
+                    epChannelID = "https://www.youtube.com/\(handle)"
+                } else if let cid = entry["channel_id"] as? String {
+                    epChannelID = "https://www.youtube.com/channel/\(cid)"
+                }
+                epChannelTitle = (entry["channel"] as? String) ?? (entry["uploader"] as? String) ?? ""
+            }
+            episodes.append(Episode(id: id, title: name, channelID: epChannelID, channelTitle: epChannelTitle,
+                                    duration: duration, published: isLive ? Date() : published, isStream: isStream || isLive,
+                                    isLive: isLive ? true : nil))
         }
         return ChannelFeed(title: title, avatar: avatarString.flatMap(URL.init(string:)), episodes: episodes)
+    }
+
+    // MARK: 訂閱動態（要登入）
+
+    static let subscriptionsURL = "https://www.youtube.com/feed/subscriptions"
+
+    static func subscriptions(cookies: URL, limit: Int = 60) async throws -> [Episode] {
+        let data = try await run([
+            "--flat-playlist", "-J", "-I", "1:\(limit)",
+            "--extractor-args", "youtubetab:approximate_date",
+            "--socket-timeout", "15", subscriptionsURL,
+        ], cookies: cookies)
+        return try parseTab(data, channelID: subscriptionsURL, isStream: false).episodes
     }
 
     // MARK: 音軌
@@ -193,7 +219,8 @@ nonisolated enum YTDLP {
                               duration: (obj["duration"] as? NSNumber)?.doubleValue,
                               title: obj["title"] as? String ?? "",
                               channelTitle: obj["channel"] as? String ?? obj["uploader"] as? String ?? "",
-                              channelID: channelID, expires: expires)
+                              channelID: channelID, expires: expires,
+                              isLive: (obj["is_live"] as? Bool) ?? false)
     }
 
     static func version() async -> String? {

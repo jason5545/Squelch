@@ -17,6 +17,7 @@ enum Snapshot {
         let view = ContentView()
             .environment(library)
             .environment(player)
+            .environment(Account())
             .frame(width: 1100, height: 700)
         let host = NSHostingView(rootView: view)
         host.frame = NSRect(x: 0, y: 0, width: 1100, height: 700)

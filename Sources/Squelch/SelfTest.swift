@@ -64,6 +64,8 @@ enum SelfTest {
             print("info  SponsorBlock segments: \(segments.map { "\($0.category) \(Format.time($0.start))–\(Format.time($0.end))" })")
         }
 
+        await accountChecks()
+        await live()
         persistence(channel: channel)
         print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
         return failures == 0
@@ -102,8 +104,77 @@ enum SelfTest {
         player.playImmediately(atRate: 2)
         try? await Task.sleep(for: .seconds(3))
         let t2 = player.currentTime().seconds
+        if t2 - middle <= 3 {
+            print("diag  \(label): rate=\(player.rate) tcs=\(player.timeControlStatus.rawValue) reason=\(player.reasonForWaitingToPlay?.rawValue ?? "-") t2=\(t2) status=\(item.status.rawValue) err=\(item.error?.localizedDescription ?? "-") end=\(item.forwardPlaybackEndTime.seconds)")
+        }
         check(t2 - middle > 3, "\(label): seek to \(Format.time(middle)) at 2×: advanced \(String(format: "%.1f", t2 - middle))s in 3s")
         player.pause()
+    }
+
+    private static func accountChecks() async {
+        let props: [HTTPCookiePropertyKey: Any] = [.domain: ".youtube.com", .path: "/", .name: "__Secure-3PAPISID",
+                                                   .value: "abc/def", .secure: "TRUE",
+                                                   .expires: Date(timeIntervalSince1970: 1_900_000_000)]
+        let cookie = HTTPCookie(properties: props)!
+        let back = Account.parseNetscape(Account.netscape([cookie]))
+        check(back.count == 1 && back[0].name == cookie.name && back[0].value == cookie.value
+              && back[0].domain == ".youtube.com" && back[0].isSecure, "cookie file round trip")
+        check(Account.isAccountDomain(".youtube.com") && Account.isAccountDomain("accounts.google.com")
+              && !Account.isAccountDomain("notyoutube.com"), "account cookie domains")
+
+        // 沒登入的影片頁也有回報網址，可以驗證解析；不送出回報。
+        var request = URLRequest(url: URL(string: "https://www.youtube.com/watch?v=2cq3ytwLrLk&hl=zh-TW")!)
+        request.setValue(Account.userAgent, forHTTPHeaderField: "User-Agent")
+        if let (data, _) = try? await URLSession.shared.data(for: request) {
+            let tracking = WatchHistory.parseTracking(html: String(decoding: data, as: UTF8.self))
+            check(tracking?.playback.host?.hasSuffix("youtube.com") == true && tracking?.watchtime.path.contains("watchtime") == true,
+                  "parse playbackTracking from watch page")
+        } else {
+            check(false, "fetch watch page")
+        }
+
+        // 已登入才測訂閱動態（只讀）。
+        let cookieFile = Account.defaultCookieFile
+        if FileManager.default.fileExists(atPath: cookieFile.path) {
+            do {
+                let feed = try await YTDLP.subscriptions(cookies: cookieFile)
+                check(!feed.isEmpty, "subscriptions feed: \(feed.count) items, \(feed.filter(\.liveNow).count) live")
+                check(feed.allSatisfy { !$0.channelID.contains("/feed/") && !$0.channelTitle.isEmpty }, "subscription items carry their own channel")
+            } catch {
+                check(false, "subscriptions: \(error.localizedDescription)")
+            }
+        } else {
+            print("info  not logged in, skipping subscriptions feed")
+        }
+    }
+
+    /// 24 小時直播的頻道，拿來測直播清單和直播播放。
+    private static func live() async {
+        do {
+            let feed = try await YTDLP.tab(channelID: "https://www.youtube.com/@LofiGirl", path: "streams", limit: 5, isStream: true)
+            guard let ep = feed.episodes.first(where: \.liveNow) else {
+                check(false, "live: no live entry on @LofiGirl/streams")
+                return
+            }
+            check(true, "live entry flagged: \(ep.title.prefix(40))")
+            let stream = try await YTDLP.resolve(videoID: ep.id)
+            check(stream.isLive && !stream.isLocal, "live resolves to HLS")
+            let item = AVPlayerItem(asset: Player.makeAsset(stream))
+            let player = AVPlayer(playerItem: item)
+            player.volume = 0
+            let started = Date()
+            while item.status == .unknown, Date().timeIntervalSince(started) < 20 {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            player.play()
+            let t0 = player.currentTime().seconds
+            try? await Task.sleep(for: .seconds(4))
+            let advanced = player.currentTime().seconds - t0
+            check(item.status == .readyToPlay && advanced > 1, "live plays: ready in \(String(format: "%.1f", Date().timeIntervalSince(started) - 4))s, advanced \(String(format: "%.1f", advanced))s")
+            player.pause()
+        } catch {
+            check(false, "live: \(error.localizedDescription)")
+        }
     }
 
     private static func persistence(channel: String) {

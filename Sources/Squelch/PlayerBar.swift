@@ -26,6 +26,15 @@ struct PlayerBar: View {
                     controls
                 }
 
+                if player.isLive {
+                    HStack(spacing: 6) {
+                        Circle().fill(.red).frame(width: 8, height: 8)
+                        Text("直播中").font(.caption.weight(.semibold))
+                        Text("已聽 \(Format.time(player.position))").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.leading, 92)
+                } else {
                 HStack(spacing: 8) {
                     Text(Format.time(scrubbing ?? player.position))
                         .font(.caption.monospacedDigit())
@@ -45,6 +54,7 @@ struct PlayerBar: View {
                         .font(.caption.monospacedDigit())
                         .frame(width: 58, alignment: .leading)
                 }
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -57,6 +67,7 @@ struct PlayerBar: View {
         HStack(spacing: 14) {
             Button { player.skip(-15) } label: { Image(systemName: "gobackward.15") }
                 .help("倒退 15 秒（⌘←）")
+                .disabled(player.isLive)
             Button { player.toggle() } label: {
                 ZStack {
                     if player.isLoading || (player.isPlaying && player.isBuffering) {
@@ -71,6 +82,7 @@ struct PlayerBar: View {
             .help("播放／暫停（空白鍵、⌘↩）")
             Button { player.skip(30) } label: { Image(systemName: "goforward.30") }
                 .help("快轉 30 秒（⌘→）")
+                .disabled(player.isLive)
             Button { player.playNext() } label: { Image(systemName: "forward.end.fill") }
                 .disabled(library.queue.filter { $0 != player.current?.id }.isEmpty)
                 .help("下一集（待播清單）")
@@ -91,6 +103,7 @@ struct PlayerBar: View {
             }
             .menuStyle(.button)
             .fixedSize()
+            .disabled(player.isLive)
             .help("播放速度（⌘[ ⌘]）")
         }
         .buttonStyle(.borderless)

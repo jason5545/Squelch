@@ -109,6 +109,9 @@ struct PlayURLSheet: View {
 }
 
 struct SettingsView: View {
+    @Environment(Account.self) private var account
+    @Environment(Library.self) private var library
+    @State private var showingLogin = false
     @AppStorage(YTDLP.customPathKey) private var customPath = ""
     @AppStorage("sb.sponsor") private var sponsor = true
     @AppStorage("sb.selfpromo") private var selfpromo = false
@@ -117,6 +120,16 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("YouTube 帳號") {
+                LabeledContent("狀態", value: account.isLoggedIn ? "已登入" : "沒有登入")
+                if account.isLoggedIn {
+                    Button("登出") { Task { await account.logout() } }
+                } else {
+                    Button("登入 YouTube…") { showingLogin = true }
+                }
+                Text("登入只用在兩件事：抓訂閱動態（含直播），以及把播放紀錄和進度回報給 YouTube。解析音軌不帶帳號。yt-dlp 官方提醒，帳號搭配 yt-dlp 有被封鎖的風險；Squelch 帶帳號的請求大約每 30 分鐘一次，加上每部影片幾次回報。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("yt-dlp") {
                 LabeledContent("使用中", value: YTDLP.binaryPath().map { "\($0)  \(version ?? "")" } ?? "找不到")
                 TextField("自訂路徑（留空自動找 Homebrew）", text: $customPath)
@@ -133,6 +146,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 480)
+        .sheet(isPresented: $showingLogin) { LoginSheet() }
         .task(id: customPath) { version = await YTDLP.version() }
     }
 }

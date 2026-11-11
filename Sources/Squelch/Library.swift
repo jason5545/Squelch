@@ -11,11 +11,13 @@ final class Library {
     var lastPlayed: [String: Date] = [:]
     var finished: Set<String> = []
     var queue: [String] = []
+    var subscriptionFeed: [String] = []
     var lastRefresh: Date?
     var refreshing = false
     var channelErrors: [String: String] = [:]
 
     @ObservationIgnored private let fileURL: URL
+    @ObservationIgnored var account: Account?
     @ObservationIgnored private var autoRefreshTask: Task<Void, Never>?
 
     private struct Snapshot: Codable {
@@ -25,6 +27,7 @@ final class Library {
         var lastPlayed: [String: Date]?
         var finished: [String]
         var queue: [String]
+        var subscriptionFeed: [String]?
         var lastRefresh: Date?
     }
 
@@ -55,6 +58,7 @@ final class Library {
         lastPlayed = snap.lastPlayed ?? [:]
         finished = Set(snap.finished)
         queue = snap.queue.filter { episodes[$0] != nil }
+        subscriptionFeed = (snap.subscriptionFeed ?? []).filter { episodes[$0] != nil }
         lastRefresh = snap.lastRefresh
         return true
     }
@@ -62,7 +66,7 @@ final class Library {
     func save() {
         let snap = Snapshot(channels: channels, episodes: Array(episodes.values), progress: progress,
                             lastPlayed: lastPlayed, finished: Array(finished).sorted(), queue: queue,
-                            lastRefresh: lastRefresh)
+                            subscriptionFeed: subscriptionFeed, lastRefresh: lastRefresh)
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys]
@@ -87,6 +91,23 @@ final class Library {
         refreshing = true
         defer { refreshing = false }
         let targets = channels.map { ($0.id, $0.includeStreams) }
+        var liveIDs = Set<String>()
+        // 只有訂閱動態帶帳號；各頻道清單照舊不帶。
+        if let account, account.isLoggedIn {
+            do {
+                let feed = try await YTDLP.subscriptions(cookies: account.cookieFile)
+                await account.importCookieFile()
+                for var ep in feed {
+                    if let old = episodes[ep.id], !ep.liveNow { ep.published = old.published ?? ep.published }
+                    episodes[ep.id] = ep
+                    if ep.liveNow { liveIDs.insert(ep.id) }
+                }
+                subscriptionFeed = feed.map(\.id)
+                channelErrors[YTDLP.subscriptionsURL] = nil
+            } catch {
+                channelErrors[YTDLP.subscriptionsURL] = error.localizedDescription
+            }
+        }
         await withTaskGroup(of: (String, Result<ChannelFeed, Error>).self) { group in
             for (id, streams) in targets {
                 group.addTask {
@@ -101,11 +122,16 @@ final class Library {
                 switch result {
                 case .success(let feed):
                     apply(feed, to: id)
+                    liveIDs.formUnion(feed.episodes.filter(\.liveNow).map(\.id))
                     channelErrors[id] = nil
                 case .failure(let error):
                     channelErrors[id] = error.localizedDescription
                 }
             }
+        }
+        // 直播結束後不會再標成直播中。
+        for (id, ep) in episodes where ep.liveNow != liveIDs.contains(id) {
+            episodes[id]?.isLive = liveIDs.contains(id) ? true : nil
         }
         lastRefresh = Date()
         prune()
@@ -128,7 +154,7 @@ final class Library {
 
     /// 每個頻道只留最新 80 部；聽到一半、待播、正在聽的不刪。
     private func prune() {
-        let keep = Set(queue).union(progress.keys)
+        let keep = Set(queue).union(progress.keys).union(subscriptionFeed)
         let grouped = Dictionary(grouping: episodes.values, by: \.channelID)
         for (_, list) in grouped where list.count > 80 {
             for ep in list.sorted(by: Self.newestFirst).dropFirst(80) where !keep.contains(ep.id) {
@@ -252,7 +278,10 @@ final class Library {
         switch item {
         case .latest:
             return episodes.values.filter { ep in channels.contains { $0.id == ep.channelID } }
-                .sorted(by: Self.newestFirst)
+                .sorted { a, b in a.liveNow != b.liveNow ? a.liveNow : Self.newestFirst(a, b) }
+        case .subscriptions:
+            return subscriptionFeed.compactMap { episodes[$0] }
+                .sorted { a, b in a.liveNow != b.liveNow ? a.liveNow : Self.newestFirst(a, b) }
         case .inProgress:
             return progress.keys.compactMap { episodes[$0] }
                 .sorted { (lastPlayed[$0.id] ?? .distantPast) > (lastPlayed[$1.id] ?? .distantPast) }

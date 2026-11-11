@@ -3,9 +3,11 @@ import SwiftUI
 struct ContentView: View {
     @Environment(Library.self) private var library
     @Environment(Player.self) private var player
+    @Environment(Account.self) private var account
     @State private var selection: SidebarItem? = .latest
     @State private var showingAddChannel = false
     @State private var showingPlayURL = false
+    @State private var showingLogin = false
 
     var body: some View {
         NavigationSplitView {
@@ -21,6 +23,23 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup {
+                if account.isLoggedIn {
+                    Menu {
+                        Text("已登入 YouTube")
+                        Button("登出") {
+                            Task {
+                                await account.logout()
+                                if selection == .subscriptions { selection = .latest }
+                            }
+                        }
+                    } label: {
+                        Label("帳號", systemImage: "person.crop.circle.fill")
+                    }
+                    .help("已登入：訂閱動態和播放紀錄會同步")
+                } else {
+                    Button { showingLogin = true } label: { Label("登入 YouTube", systemImage: "person.crop.circle") }
+                        .help("登入後可以看訂閱動態（含直播），播放紀錄也會同步到 YouTube")
+                }
                 Button { showingPlayURL = true } label: { Label("播放影片網址", systemImage: "link") }
                     .help("貼上 YouTube 影片網址直接播")
                 Button { showingAddChannel = true } label: { Label("加入頻道", systemImage: "plus") }
@@ -40,6 +59,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingAddChannel) { AddChannelSheet() }
         .sheet(isPresented: $showingPlayURL) { PlayURLSheet() }
+        .sheet(isPresented: $showingLogin) { LoginSheet() }
         .onKeyPress(.space) {
             guard player.current != nil else { return .ignored }
             player.toggle()
@@ -50,11 +70,23 @@ struct ContentView: View {
 
 struct Sidebar: View {
     @Environment(Library.self) private var library
+    @Environment(Account.self) private var account
     @Binding var selection: SidebarItem?
 
     var body: some View {
         List(selection: $selection) {
             Label("最新", systemImage: "tray.full").tag(SidebarItem.latest)
+            if account.isLoggedIn {
+                HStack {
+                    Label("訂閱動態", systemImage: "person.2.wave.2")
+                    Spacer()
+                    if let error = library.channelErrors[YTDLP.subscriptionsURL] {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).help(error)
+                    }
+                }
+                .tag(SidebarItem.subscriptions)
+                .badge(library.list(for: .subscriptions).filter(\.liveNow).count)
+            }
             Label("聽到一半", systemImage: "clock.arrow.circlepath").tag(SidebarItem.inProgress)
                 .badge(library.progress.count)
             Label("待播清單", systemImage: "list.bullet").tag(SidebarItem.queue)
@@ -163,6 +195,13 @@ struct EpisodeList: View {
                                    description: Text("在影片上按右鍵，選「加到待播清單」。"))
         case .inProgress:
             ContentUnavailableView("沒有聽到一半的", systemImage: "clock.arrow.circlepath")
+        case .subscriptions:
+            if library.refreshing {
+                ProgressView("正在抓訂閱動態…")
+            } else {
+                ContentUnavailableView("訂閱動態是空的", systemImage: "person.2.wave.2",
+                                       description: Text(library.channelErrors[YTDLP.subscriptionsURL] ?? "按右上角的重新整理。"))
+            }
         default:
             if library.channels.isEmpty {
                 ContentUnavailableView("還沒有頻道", systemImage: "antenna.radiowaves.left.and.right",
@@ -179,6 +218,7 @@ struct EpisodeList: View {
     private var title: String {
         switch item {
         case .latest: "最新"
+        case .subscriptions: "訂閱動態"
         case .inProgress: "聽到一半"
         case .queue: "待播清單"
         case .channel(let id): library.channels.first { $0.id == id }?.title ?? "頻道"
@@ -209,7 +249,14 @@ struct EpisodeRow: View {
             .frame(width: 112, height: 63)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(alignment: .bottomTrailing) {
-                if let d = episode.duration {
+                if episode.liveNow {
+                    Text("● 直播中")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 4).padding(.vertical, 1)
+                        .background(.red, in: RoundedRectangle(cornerRadius: 3))
+                        .foregroundStyle(.white)
+                        .padding(4)
+                } else if let d = episode.duration {
                     Text(Format.time(d))
                         .font(.caption2.monospacedDigit().weight(.semibold))
                         .padding(.horizontal, 4).padding(.vertical, 1)
@@ -229,7 +276,7 @@ struct EpisodeRow: View {
                         Text("·")
                         Text(date, format: .relative(presentation: .named))
                     }
-                    if episode.isStream {
+                    if episode.isStream && !episode.liveNow {
                         Text("直播回放")
                             .padding(.horizontal, 4)
                             .background(.quaternary, in: RoundedRectangle(cornerRadius: 3))

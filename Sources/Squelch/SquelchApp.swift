@@ -41,10 +41,15 @@ struct SquelchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var library: Library
     @State private var player: Player
+    @State private var account: Account
 
     init() {
+        let account = Account()
         let library = Library()
+        library.account = account
         let player = Player(library: library)
+        player.history = WatchHistory(account: account)
+        _account = State(initialValue: account)
         _library = State(initialValue: library)
         _player = State(initialValue: player)
         AppDelegate.player = player
@@ -57,6 +62,7 @@ struct SquelchApp: App {
             ContentView()
                 .environment(library)
                 .environment(player)
+                .environment(account)
                 .frame(minWidth: 820, minHeight: 500)
         }
         .commands { PlaybackCommands(player: player) }
@@ -71,6 +77,8 @@ struct SquelchApp: App {
 
         Settings {
             SettingsView()
+                .environment(library)
+                .environment(account)
         }
     }
 }

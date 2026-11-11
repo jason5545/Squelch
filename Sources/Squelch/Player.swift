@@ -15,15 +15,19 @@ final class Player {
     var errorMessage: String?
     var notice: String?
     var segments: [SkipSegment] = []
+    var isLive = false
     var rate: Float {
         didSet {
             UserDefaults.standard.set(rate, forKey: "rate")
-            if isPlaying { avPlayer.rate = rate }
+            if isPlaying && !isLive { avPlayer.rate = rate }
             nowPlaying.update()
         }
     }
 
     @ObservationIgnored let library: Library
+    /// 登入時回報播放紀錄；沒登入時 `WatchHistory` 自己什麼都不做。
+    @ObservationIgnored var history: WatchHistory?
+    @ObservationIgnored private var historyStarted = false
     @ObservationIgnored let avPlayer = AVPlayer()
     @ObservationIgnored private(set) var nowPlaying = NowPlaying()
     @ObservationIgnored private var timeObserver: Any?
@@ -67,7 +71,9 @@ final class Player {
     // MARK: 播放
 
     func play(_ ep: Episode) {
+        if current != nil { history?.stop(at: position) }
         saveProgress(force: true)
+        historyStarted = false
         let token = UUID()
         loadToken = token
         library.remember(ep)
@@ -78,22 +84,29 @@ final class Player {
         segments = []
         skipped = []
         retried = false
-        position = library.resumePosition(for: ep)
-        duration = ep.duration ?? 0
+        isLive = ep.liveNow
+        position = isLive ? 0 : library.resumePosition(for: ep)
+        duration = isLive ? 0 : ep.duration ?? 0
         teardownItem()
         nowPlaying.update()
         Task {
             do {
                 let stream = try await stream(for: ep.id)
                 guard token == loadToken else { return }
-                if duration == 0, let d = stream.duration { duration = d }
+                if stream.isLive {
+                    isLive = true
+                    duration = 0
+                    position = 0
+                } else if duration == 0, let d = stream.duration {
+                    duration = d
+                }
                 start(stream, at: position)
             } catch {
                 guard token == loadToken else { return }
                 isLoading = false
                 errorMessage = error.localizedDescription
             }
-            let categories = SponsorBlock.enabledCategories
+            let categories = isLive ? [] : SponsorBlock.enabledCategories
             let found = await SponsorBlock.segments(videoID: ep.id, categories: categories)
             guard token == loadToken else { return }
             segments = found
@@ -128,7 +141,7 @@ final class Player {
         let item = AVPlayerItem(asset: Self.makeAsset(stream))
         item.audioTimePitchAlgorithm = .timeDomain
         item.preferredForwardBufferDuration = 120
-        pendingSeek = seconds > 1 ? seconds : nil
+        pendingSeek = seconds > 1 && !isLive ? seconds : nil
         statusObservation = item.observe(\.status) { [weak self] item, _ in
             let status = item.status
             let message = item.error?.localizedDescription
@@ -154,7 +167,7 @@ final class Player {
         case .readyToPlay:
             guard isLoading else { return }
             isLoading = false
-            if let d = avPlayer.currentItem?.duration.seconds, d.isFinite, d > 0 { duration = d }
+            if !isLive, let d = avPlayer.currentItem?.duration.seconds, d.isFinite, d > 0 { duration = d }
             if let target = pendingSeek {
                 pendingSeek = nil
                 avPlayer.seek(to: CMTime(seconds: target, preferredTimescale: 600)) { [weak self] _ in
@@ -193,8 +206,14 @@ final class Player {
     }
 
     private func beginPlayback() {
-        avPlayer.playImmediately(atRate: rate)
+        avPlayer.playImmediately(atRate: isLive ? 1 : rate)
         isPlaying = true
+        if let ep = current, !historyStarted {
+            historyStarted = true
+            history?.start(videoID: ep.id, at: position)
+        } else {
+            history?.resumed(at: position)
+        }
         nowPlaying.update()
         prefetchNext()
     }
@@ -220,8 +239,9 @@ final class Player {
         } else if avPlayer.currentItem == nil {
             play(ep)
         } else {
-            avPlayer.playImmediately(atRate: rate)
+            avPlayer.playImmediately(atRate: isLive ? 1 : rate)
             isPlaying = true
+            history?.resumed(at: position)
             nowPlaying.update()
         }
     }
@@ -234,6 +254,7 @@ final class Player {
         guard isPlaying else { return }
         avPlayer.pause()
         isPlaying = false
+        history?.paused(at: position)
         saveProgress(force: true)
         nowPlaying.update()
     }
@@ -243,9 +264,10 @@ final class Player {
     }
 
     func seek(to seconds: Double) {
-        guard current != nil else { return }
+        guard current != nil, !isLive else { return }
         let upper = duration > 0 ? duration - 1 : seconds
         let target = max(0, min(seconds, upper))
+        if isPlaying { history?.seeked(from: position, to: target) }
         position = target
         if isLoading {
             pendingSeek = target
@@ -272,8 +294,10 @@ final class Player {
     private func tick(_ seconds: Double) {
         guard current != nil, !isLoading, seconds.isFinite else { return }
         position = seconds
-        if isPlaying, let seg = segments.first(where: { seconds >= $0.start && seconds < $0.end - 0.5 && !skipped.contains($0) }) {
+        history?.tick(at: seconds, playing: isPlaying)
+        if isPlaying, !isLive, let seg = segments.first(where: { seconds >= $0.start && seconds < $0.end - 0.5 && !skipped.contains($0) }) {
             skipped.insert(seg)
+            history?.seeked(from: seconds, to: seg.end)
             avPlayer.seek(to: CMTime(seconds: seg.end, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
             position = seg.end
             show("已跳過\(seg.label) \(Format.time(seg.end - seg.start))")
@@ -283,7 +307,7 @@ final class Player {
     }
 
     func saveProgress(force: Bool) {
-        guard let ep = current, !isLoading else { return }
+        guard let ep = current, !isLoading, !isLive else { return }
         guard force || Date().timeIntervalSince(lastSaved) > 5 else { return }
         lastSaved = Date()
         if duration > 0, position >= duration - 15 { return }
@@ -292,6 +316,7 @@ final class Player {
 
     private func didFinish() {
         guard let ep = current else { return }
+        history?.stop(at: duration)
         library.markFinished(ep.id)
         isPlaying = false
         position = duration
