@@ -11,7 +11,8 @@ enum Main {
             Task { @MainActor in
                 let item: SidebarItem = CommandLine.arguments.contains("--subscriptions") ? .subscriptions
                     : CommandLine.arguments.contains("--search") ? .search : .latest
-                await Snapshot.render(to: URL(fileURLWithPath: path), item: item)
+                await Snapshot.render(to: URL(fileURLWithPath: path), item: item,
+                                      panelOnly: CommandLine.arguments.contains("--panel"))
                 exit(0)
             }
             NSApplication.shared.setActivationPolicy(.accessory)
@@ -67,7 +68,7 @@ struct SquelchApp: App {
                 .environment(library)
                 .environment(player)
                 .environment(account)
-                .frame(minWidth: 820, minHeight: 500)
+                .frame(minWidth: 900, minHeight: 500)
         }
         .commands { PlaybackCommands(player: player) }
 

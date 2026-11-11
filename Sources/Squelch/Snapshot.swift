@@ -2,9 +2,10 @@ import AppKit
 import SwiftUI
 
 /// `Squelch --snapshot out.png`：把主視窗畫成 PNG，用真的頻道資料，不需要螢幕錄影權限。
+/// 加 `--panel` 只畫右側的「正在播放」面板：離屏截圖抓不到 inspector 和側欄（毛玻璃），主視窗裡那兩欄是黑的。
 @MainActor
 enum Snapshot {
-    static func render(to url: URL, item: SidebarItem = .latest) async {
+    static func render(to url: URL, item: SidebarItem = .latest, panelOnly: Bool = false) async {
         let library = Library()
         if library.episodes.isEmpty { await library.refresh() }
         if item == .search { await library.search("WWDC SwiftUI") }
@@ -15,13 +16,17 @@ enum Snapshot {
             player.position = player.duration * 0.31
             player.segments = [SkipSegment(start: 101, end: 195, category: "sponsor")]
         }
-        let view = ContentView(initialSelection: item)
+        let size = panelOnly ? NSSize(width: 300, height: 760) : NSSize(width: 1100, height: 700)
+        let root: AnyView = panelOnly
+            ? AnyView(PlayerPanel().background(Color(nsColor: .windowBackgroundColor)))
+            : AnyView(ContentView(initialSelection: item))
+        let view = root
             .environment(library)
             .environment(player)
             .environment(Account(checkWebKit: false))
-            .frame(width: 1100, height: 700)
+            .frame(width: size.width, height: size.height)
         let host = NSHostingView(rootView: view)
-        host.frame = NSRect(x: 0, y: 0, width: 1100, height: 700)
+        host.frame = NSRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: host.frame, styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
         window.contentView = host

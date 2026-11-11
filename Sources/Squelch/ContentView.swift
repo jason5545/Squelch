@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var showingPlayURL = false
     @State private var showingLogin = false
     @State private var searchText = ""
+    @AppStorage("showPlayerPanel") private var showPanel = true
 
     var body: some View {
         NavigationSplitView {
@@ -21,10 +22,13 @@ struct ContentView: View {
         } detail: {
             EpisodeList(item: selection ?? .latest)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if player.current != nil {
-                PlayerBar()
-            }
+        .inspector(isPresented: $showPanel) {
+            PlayerPanel()
+                .inspectorColumnWidth(min: 280, ideal: 300, max: 400)
+        }
+        // 從沒在播變成開始播時，把收起來的面板打開。
+        .onChange(of: player.current?.id) { old, new in
+            if old == nil, new != nil { showPanel = true }
         }
         .toolbar {
             ToolbarItemGroup {
@@ -62,6 +66,19 @@ struct ContentView: View {
                 }
                 .help(library.lastRefresh.map { String(localized: "上次更新：\($0.formatted(date: .omitted, time: .shortened))") } ?? String(localized: "重新整理"))
                 .disabled(library.refreshing)
+            }
+            ToolbarItemGroup {
+                // 面板收起來時，工具列留一個播放／暫停。
+                if !showPanel, player.current != nil {
+                    Button { player.toggle() } label: {
+                        Label(player.isPlaying ? "暫停" : "播放", systemImage: player.isPlaying ? "pause.fill" : "play.fill")
+                    }
+                    .help("播放／暫停（空白鍵、⌘↩）")
+                }
+                Button { showPanel.toggle() } label: {
+                    Label("正在播放", systemImage: "sidebar.trailing")
+                }
+                .help(showPanel ? "收起正在播放" : "顯示正在播放")
             }
         }
         // 按 Enter 才搜尋，打字當下不查，免得一直呼叫 yt-dlp。
@@ -346,7 +363,7 @@ struct EpisodeRow: View {
                         .padding(4)
                 } else if let d = episode.duration {
                     Text(Format.time(d))
-                        .font(.caption2.monospacedDigit().weight(.semibold))
+                        .font(.timecodeSmall.weight(.semibold))
                         .padding(.horizontal, 4).padding(.vertical, 1)
                         .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
                         .foregroundStyle(.white)
@@ -380,7 +397,7 @@ struct EpisodeRow: View {
                         ProgressView(value: min(progress, d), total: d)
                             .frame(maxWidth: 160)
                         Text("剩 \(Format.time(d - progress))")
-                            .font(.caption2.monospacedDigit())
+                            .font(.timecodeSmall)
                             .foregroundStyle(.secondary)
                     }
                 }
