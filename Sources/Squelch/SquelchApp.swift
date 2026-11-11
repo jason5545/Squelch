@@ -10,7 +10,9 @@ enum Main {
             let path = CommandLine.arguments[index + 1]
             Task { @MainActor in
                 let item: SidebarItem = CommandLine.arguments.contains("--subscriptions") ? .subscriptions
-                    : CommandLine.arguments.contains("--search") ? .search : .latest
+                    : CommandLine.arguments.contains("--search") ? .search
+                    : CommandLine.arguments.contains("--channel") ? .channel("")
+                    : CommandLine.arguments.contains("--queue") ? .queue : .latest
                 await Snapshot.render(to: URL(fileURLWithPath: path), item: item,
                                       panelOnly: CommandLine.arguments.contains("--panel"))
                 exit(0)

@@ -9,14 +9,18 @@ enum Snapshot {
         let library = Library()
         if library.episodes.isEmpty { await library.refresh() }
         if item == .search { await library.search("WWDC SwiftUI") }
+        // `--channel`：第一個頻道的頁面。
+        var item = item
+        if item == .channel(""), let first = library.channels.first { item = .channel(first.id) }
         let player = Player(library: library)
         if let ep = library.list(for: .latest).first {
             player.current = ep
             player.duration = ep.duration ?? 2900
             player.position = player.duration * 0.31
             player.segments = [SkipSegment(start: 101, end: 195, category: "sponsor")]
+            player.isPlaying = true
         }
-        let size = panelOnly ? NSSize(width: 300, height: 760) : NSSize(width: 1100, height: 700)
+        let size = panelOnly ? NSSize(width: 320, height: 820) : NSSize(width: 1280, height: 800)
         let root: AnyView = panelOnly
             ? AnyView(PlayerPanel().background(Color(nsColor: .windowBackgroundColor)))
             : AnyView(ContentView(initialSelection: item))

@@ -1,33 +1,36 @@
 {
   "sourceLanguage": "zh-Hant",
   "strings": {
+    "#": {
+      "shouldTranslate": false
+    },
     "%@ · %@ / %@ · %@": {
       "shouldTranslate": false
     },
-    "%@：會自動跳過": {
+    "%@ · 剩 %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@: skipped automatically"
+            "value": "%1$@ · %2$@ left"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@：自動でスキップ"
+            "value": "%1$@ · 残り %2$@"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@：会自动跳过"
+            "value": "%1$@ · 剩 %2$@"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@：會自動跳過"
+            "value": "%1$@ · 剩 %2$@"
           }
         }
       }
@@ -459,6 +462,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "● 直播中"
+          }
+        }
+      }
+    },
+    "「%@」": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@”"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」"
           }
         }
       }
@@ -1135,34 +1166,6 @@
         }
       }
     },
-    "在待播清單裡": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "In Up Next"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "再生待ちにあります"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在待播列表中"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "在待播清單裡"
-          }
-        }
-      }
-    },
     "在設定的「直播狀態」，或在側欄的頻道上按右鍵勾選。": {
       "localizations": {
         "en": {
@@ -1607,6 +1610,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "待播清單是空的。在影片上按右鍵，選「加到待播清單」。"
+          }
+        }
+      }
+    },
+    "從「%@」開始播": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play from “%@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」から再生"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从“%@”开始播放"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從「%@」開始播"
           }
         }
       }
@@ -2115,6 +2146,34 @@
         }
       }
     },
+    "播放中": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playing"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再生中"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放中"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放中"
+          }
+        }
+      }
+    },
     "播放失敗": {
       "localizations": {
         "en": {
@@ -2423,6 +2482,34 @@
         }
       }
     },
+    "最新影片": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest Videos"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新の動画"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新视频"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新影片"
+          }
+        }
+      }
+    },
     "會跳過 %lld 段": {
       "localizations": {
         "en": {
@@ -2543,6 +2630,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "標成聽完了"
+          }
+        }
+      }
+    },
+    "標題": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトル"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標題"
           }
         }
       }
@@ -2827,6 +2942,34 @@
         }
       }
     },
+    "正在直播": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Now"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブ配信中"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在直播"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在直播"
+          }
+        }
+      }
+    },
     "沒有在播": {
       "localizations": {
         "en": {
@@ -2935,6 +3078,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "沒辦法放大音量：%@"
+          }
+        }
+      }
+    },
+    "清單": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リスト"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列表"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清單"
           }
         }
       }
@@ -3247,6 +3418,34 @@
         }
       }
     },
+    "直播": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直播"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直播"
+          }
+        }
+      }
+    },
     "直播中": {
       "localizations": {
         "en": {
@@ -3523,6 +3722,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "結束 Squelch"
+          }
+        }
+      }
+    },
+    "綠色的片段會自動跳過": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Green segments are skipped automatically"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "緑の区間は自動でスキップされます"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "绿色片段会自动跳过"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "綠色的片段會自動跳過"
+          }
+        }
+      }
+    },
+    "繼續聽": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue Listening"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "続きを聴く"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "继续听"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繼續聽"
           }
         }
       }
@@ -3831,6 +4086,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "貼上 YouTube 影片網址直接播"
+          }
+        }
+      }
+    },
+    "資料庫": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブラリ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资料库"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "資料庫"
           }
         }
       }
@@ -4363,6 +4646,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "頻道"
+          }
+        }
+      }
+    },
+    "頻道設定": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Channel Settings"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チャンネル設定"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "频道设置"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "頻道設定"
           }
         }
       }

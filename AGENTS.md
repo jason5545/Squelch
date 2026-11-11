@@ -1,7 +1,8 @@
 # Squelch 協作規則
 
 - 改完一定跑 `make selftest`，全部 PASS 才算完成。它會實際連 YouTube：清單、三條播放路徑（自己解碼的 HLS、AVPlayer 的 HLS、下載備援：長度、開播、跳轉、倍速）、音量放大、SponsorBlock、存檔。測試頻道是 @AppleDeveloper，不要換成個人訂閱的頻道。自我測試全程不出聲（`silent`），新加的播放測試也要這樣。
-- 看介面用 `Squelch.app/Contents/MacOS/Squelch --snapshot <png>`，不要用 screencapture（會跳螢幕錄影權限）。離屏截圖抓不到側欄和右側「正在播放」面板（inspector）的毛玻璃，這兩欄是黑的屬正常；要看面板加 `--panel`，只畫面板。
+- 看介面用 `Squelch.app/Contents/MacOS/Squelch --snapshot <png>`，不要用 screencapture（會跳螢幕錄影權限）。離屏截圖抓不到側欄和右側「正在播放」面板（inspector）的毛玻璃，這兩欄是黑的屬正常；要看面板加 `--panel`，只畫面板。其他頁面：`--channel`（第一個頻道）、`--queue`、`--search`、`--subscriptions`。離屏截圖也畫不出 `.blur` 這類圖層濾鏡，面板背景因此用縮到 6×6 的封面平滑放大（`ArtworkPalette.ambient`），不靠模糊。
+- 配色、取封面色、細進度條、播放鈕這些共用元件在 `Theme.swift`。主視窗固定深色（`preferredColorScheme(.dark)`），顏色寫死成深色用的；要支援淺色模式得一起改。
 - 解析 YouTube 一律交給 yt-dlp，不自己寫 InnerTube。yt-dlp 和 deno 包在 App 裡，不靠 Homebrew：版本和 SHA-256 寫在 `scripts/vendor-tools.sh`，建置時 `scripts/embed-tools.sh` 放進 App 並簽章（deno 在 `Contents/Helpers`，yt-dlp 整包在 `Contents/Resources/yt-dlp`，放 Helpers 會簽不過）。yt-dlp 壞了先在設定按「檢查更新」，要換內建的版本就改 `vendor-tools.sh` 的版本和雜湊。自我測試會關掉 Homebrew（`YTDLP.allowHomebrew`），確認用的是內建或自動更新的那份。
 - App 不帶 ffmpeg。下載備援一定加 `--fixup never`，再用 `YTDLP.remux`（AVFoundation passthrough）修正分段式 MP4 的長度，不要改回依賴 ffmpeg。唯一例外是 `WatchHistory`：從影片頁取得播放紀錄的回報網址，yt-dlp 沒有提供帶真實進度的回報。
 - 帶帳號的請求只有訂閱動態、觀看記錄和播放紀錄回報；解析音軌（`YTDLP.resolve`）和搜尋（`YTDLP.search`）不准加 `--cookies`。訂閱動態和觀看記錄都只在使用者打開或按重新整理時抓，不跟著自動更新跑（`refreshAvoidsAccount` 測試會檢查）。播放紀錄回報最多每 5 分鐘一次，加上開始、暫停、跳轉、聽完、換集。

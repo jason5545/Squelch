@@ -18,14 +18,23 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             Sidebar(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 200, ideal: 230)
+                .navigationSplitViewColumnWidth(min: 210, ideal: 240)
         } detail: {
             EpisodeList(item: selection ?? .latest)
         }
-        .inspector(isPresented: $showPanel) {
+        // 沒在播時不佔位置；有在播才照使用者上次的開關。
+        .inspector(isPresented: Binding(
+            get: { showPanel && player.current != nil },
+            set: { showPanel = $0 })) {
             PlayerPanel()
-                .inspectorColumnWidth(min: 280, ideal: 300, max: 400)
+                .inspectorColumnWidth(min: 280, ideal: 320, max: 420)
         }
+        // 播放列橫跨整個視窗底部，播放鍵、進度、音量都在這裡；右側面板放封面和接下來。
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            NowPlayingBar(showPanel: $showPanel)
+        }
+        .tint(Theme.amber)
+        .preferredColorScheme(.dark)
         // 從沒在播變成開始播時，把收起來的面板打開。
         .onChange(of: player.current?.id) { old, new in
             if old == nil, new != nil { showPanel = true }
@@ -67,19 +76,6 @@ struct ContentView: View {
                 .help(library.lastRefresh.map { String(localized: "上次更新：\($0.formatted(date: .omitted, time: .shortened))") } ?? String(localized: "重新整理"))
                 .disabled(library.refreshing)
             }
-            ToolbarItemGroup {
-                // 面板收起來時，工具列留一個播放／暫停。
-                if !showPanel, player.current != nil {
-                    Button { player.toggle() } label: {
-                        Label(player.isPlaying ? "暫停" : "播放", systemImage: player.isPlaying ? "pause.fill" : "play.fill")
-                    }
-                    .help("播放／暫停（空白鍵、⌘↩）")
-                }
-                Button { showPanel.toggle() } label: {
-                    Label("正在播放", systemImage: "sidebar.trailing")
-                }
-                .help(showPanel ? "收起正在播放" : "顯示正在播放")
-            }
         }
         // 按 Enter 才搜尋，打字當下不查，免得一直呼叫 yt-dlp。
         .searchable(text: $searchText, placement: .toolbar, prompt: "搜尋 YouTube")
@@ -98,75 +94,153 @@ struct ContentView: View {
     }
 }
 
+// MARK: - 側欄
+
 struct Sidebar: View {
     @Environment(Library.self) private var library
     @Environment(Account.self) private var account
     @Binding var selection: SidebarItem?
 
     var body: some View {
+        let liveChannels = Set(library.episodes.values.filter(\.liveNow).map(\.channelID))
+        let newest = newestByChannel
         List(selection: $selection) {
             // `.tag` 一定要放在最後（`.badge` 之後）。寫成 `.tag(...).badge(...)` 時 tag 被包在裡面，
             // List 讀不到，有數字的列（直播中、訂閱動態、聽到一半、待播清單）點了都選不到。
-            Label("最新", systemImage: "tray.full").tag(SidebarItem.latest)
-            Label("直播中", systemImage: "dot.radiowaves.left.and.right")
-                .badge(library.list(for: .live).count)
-                .tag(SidebarItem.live)
-            Label("搜尋結果", systemImage: "magnifyingglass").tag(SidebarItem.search)
-            Label("訂閱動態", systemImage: "person.2.wave.2")
-                .badge(account.isLoggedIn ? library.list(for: .subscriptions).filter(\.liveNow).count : 0)
-                .tag(SidebarItem.subscriptions)
-            Label("聽到一半", systemImage: "clock.arrow.circlepath")
-                .badge(library.progress.count)
-                .tag(SidebarItem.inProgress)
-            Label("待播清單", systemImage: "list.bullet")
-                .badge(library.queue.count)
-                .tag(SidebarItem.queue)
-            Label("觀看記錄", systemImage: "clock").tag(SidebarItem.history)
+            Section("資料庫") {
+                tile("最新", .latest).tag(SidebarItem.latest)
+                tile("直播中", .live)
+                    .badge(library.list(for: .live).count)
+                    .tag(SidebarItem.live)
+                tile("搜尋結果", .search).tag(SidebarItem.search)
+                tile("訂閱動態", .subscriptions)
+                    .badge(account.isLoggedIn ? library.list(for: .subscriptions).filter(\.liveNow).count : 0)
+                    .tag(SidebarItem.subscriptions)
+                tile("聽到一半", .inProgress)
+                    .badge(library.progress.count)
+                    .tag(SidebarItem.inProgress)
+                tile("待播清單", .queue)
+                    .badge(library.queue.count)
+                    .tag(SidebarItem.queue)
+                tile("觀看記錄", .history).tag(SidebarItem.history)
+            }
             Section("頻道") {
                 ForEach(library.channels) { channel in
-                    ChannelRow(channel: channel).tag(SidebarItem.channel(channel.id))
+                    ChannelRow(channel: channel, isLive: liveChannels.contains(channel.id), newest: newest[channel.id])
+                        .tag(SidebarItem.channel(channel.id))
                 }
             }
         }
+    }
+
+    private func tile(_ title: LocalizedStringKey, _ item: SidebarItem) -> some View {
+        Label { Text(title) } icon: { TileIcon(item: item) }
+    }
+
+    /// 每個頻道最新一部的時間，側欄第二行用。
+    private var newestByChannel: [String: Date] {
+        var result: [String: Date] = [:]
+        for ep in library.episodes.values {
+            guard let date = ep.published else { continue }
+            if date > result[ep.channelID] ?? .distantPast { result[ep.channelID] = date }
+        }
+        return result
     }
 }
 
 struct ChannelRow: View {
     @Environment(Library.self) private var library
     let channel: Channel
+    var isLive = false
+    var newest: Date?
 
     var body: some View {
-        HStack(spacing: 8) {
-            AsyncImage(url: channel.avatar) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                Circle().fill(.quaternary)
+        HStack(spacing: 10) {
+            Thumbnail(url: channel.avatar, cornerRadius: 15)
+                .frame(width: 30, height: 30)
+                .overlay {
+                    if isLive { Circle().strokeBorder(Theme.live, lineWidth: 2) }
+                }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(channel.title).lineLimit(1)
+                Group {
+                    if isLive {
+                        Text("● 直播中").foregroundStyle(Theme.live)
+                    } else if let newest {
+                        Text(newest, format: .relative(presentation: .named))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.caption)
+                .lineLimit(1)
             }
-            .frame(width: 22, height: 22)
-            .clipShape(Circle())
-            Text(channel.title).lineLimit(1)
-            Spacer()
+            Spacer(minLength: 0)
             if let error = library.channelErrors[channel.id] {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .help(error)
             }
         }
-        .contextMenu {
-            Toggle("檢查直播", isOn: Binding(
-                get: { channel.watchLive == true },
-                set: { library.setWatchLive(channel.id, $0) }))
-            Toggle("包含直播回放", isOn: Binding(
-                get: { channel.includeStreams },
-                set: { library.setIncludeStreams(channel.id, $0) }))
-            Button("在 YouTube 開啟") {
-                if let url = URL(string: channel.id) { NSWorkspace.shared.open(url) }
-            }
+        .padding(.vertical, 2)
+        .contextMenu { ChannelMenu(channel: channel) }
+    }
+}
+
+/// 頻道的右鍵選單，頁首的「⋯」也用同一份。
+struct ChannelMenu: View {
+    @Environment(Library.self) private var library
+    let channel: Channel
+
+    var body: some View {
+        Toggle("檢查直播", isOn: Binding(
+            get: { channel.watchLive == true },
+            set: { library.setWatchLive(channel.id, $0) }))
+        Toggle("包含直播回放", isOn: Binding(
+            get: { channel.includeStreams },
+            set: { library.setIncludeStreams(channel.id, $0) }))
+        Button("在 YouTube 開啟") {
+            if let url = URL(string: channel.id) { NSWorkspace.shared.open(url) }
+        }
+        Divider()
+        Button("移除頻道", role: .destructive) { library.removeChannel(channel.id) }
+    }
+}
+
+/// 影片的右鍵選單，清單每一列的「⋯」和卡片也用同一份。
+struct EpisodeMenu: View {
+    @Environment(Library.self) private var library
+    @Environment(Player.self) private var player
+    let episode: Episode
+
+    var body: some View {
+        let ep = episode
+        Button("播放") { player.play(ep) }
+        Button("下一首播") { library.playNextInQueue(ep.id) }
+        if library.queue.contains(ep.id) {
+            Button("移出待播清單") { library.dequeue(ep.id) }
+        } else {
+            Button("加到待播清單") { library.enqueue(ep.id) }
+        }
+        Divider()
+        Button(library.finished.contains(ep.id) ? "標成沒聽過" : "標成聽完了") {
+            library.toggleFinished(ep.id)
+        }
+        if !ep.channelID.isEmpty, !library.channels.contains(where: { $0.id == ep.channelID }) {
             Divider()
-            Button("移除頻道", role: .destructive) { library.removeChannel(channel.id) }
+            Button("加入頻道「\(ep.channelTitle.isEmpty ? String(localized: "這個頻道") : ep.channelTitle)」") {
+                Task { try? await library.addChannel(ep.channelID) }
+            }
+        }
+        Divider()
+        Button("在 YouTube 開啟") { NSWorkspace.shared.open(ep.watchURL) }
+        Button("複製影片網址") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(ep.watchURL.absoluteString, forType: .string)
         }
     }
 }
+
+// MARK: - 清單頁
 
 struct EpisodeList: View {
     @Environment(Library.self) private var library
@@ -176,26 +250,52 @@ struct EpisodeList: View {
 
     var body: some View {
         let episodes = library.list(for: item)
+        let live = item == .latest ? library.list(for: .live) : []
+        let resume = item == .latest ? Array(library.list(for: .inProgress).prefix(12)) : []
         Group {
             if episodes.isEmpty {
-                empty
+                ScrollView {
+                    VStack(spacing: 0) {
+                        header(episodes)
+                        empty
+                            .frame(maxWidth: .infinity, minHeight: 280)
+                    }
+                }
             } else {
                 List {
+                    header(episodes).plainRow()
+                    if !live.isEmpty {
+                        Shelf(title: "正在直播", episodes: live).plainRow()
+                    }
+                    if !resume.isEmpty {
+                        Shelf(title: "繼續聽", episodes: resume).plainRow()
+                    }
+                    if !live.isEmpty || !resume.isEmpty {
+                        Text("最新影片")
+                            .font(.title2.bold())
+                            .padding(.horizontal, 28)
+                            .padding(.top, 14)
+                            .plainRow()
+                    }
+                    columnHeader.plainRow()
                     if item == .queue {
-                        ForEach(episodes) { row($0) }
+                        ForEach(Array(episodes.enumerated()), id: \.element.id) { index, ep in row(ep, index) }
                             .onMove { library.moveQueue(from: $0, to: $1) }
                             .onDelete { offsets in
                                 offsets.map { episodes[$0].id }.forEach(library.dequeue)
                             }
                     } else {
-                        ForEach(episodes) { row($0) }
+                        ForEach(Array(episodes.enumerated()), id: \.element.id) { index, ep in row(ep, index) }
                     }
+                    Color.clear.frame(height: 24).plainRow()
                 }
-                .listStyle(.inset)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
             }
         }
+        .background { PageBackground(color: pageColor) }
         .navigationTitle(title)
-        .navigationSubtitle(subtitle(episodes))
+        .toolbar(removing: .title)
         .task(id: item) {
             if item == .history { await library.loadHistory() }
             if item == .subscriptions { await library.loadSubscriptions() }
@@ -205,36 +305,123 @@ struct EpisodeList: View {
         }
     }
 
-    private func row(_ ep: Episode) -> some View {
-        EpisodeRow(episode: ep)
+    private func row(_ ep: Episode, _ index: Int) -> some View {
+        EpisodeRow(episode: ep, index: index + 1, showChannel: channel == nil)
             .contentShape(Rectangle())
-            .onTapGesture { player.play(ep) }
-            .contextMenu {
-                Button("播放") { player.play(ep) }
-                Button("下一首播") { library.playNextInQueue(ep.id) }
-                if library.queue.contains(ep.id) {
-                    Button("移出待播清單") { library.dequeue(ep.id) }
-                } else {
-                    Button("加到待播清單") { library.enqueue(ep.id) }
-                }
-                Divider()
-                Button(library.finished.contains(ep.id) ? "標成沒聽過" : "標成聽完了") {
-                    library.toggleFinished(ep.id)
-                }
-                if !ep.channelID.isEmpty, !library.channels.contains(where: { $0.id == ep.channelID }) {
-                    Divider()
-                    Button("加入頻道「\(ep.channelTitle.isEmpty ? String(localized: "這個頻道") : ep.channelTitle)」") {
-                        Task { try? await library.addChannel(ep.channelID) }
-                    }
-                }
-                Divider()
-                Button("在 YouTube 開啟") { NSWorkspace.shared.open(ep.watchURL) }
-                Button("複製影片網址") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(ep.watchURL.absoluteString, forType: .string)
-                }
+            .onTapGesture {
+                // 點正在播的那一列是暫停／繼續，不要從頭重新載入。
+                if player.current?.id == ep.id { player.toggle() } else { player.play(ep) }
             }
+            .contextMenu { EpisodeMenu(episode: ep) }
+            .plainRow()
     }
+
+    // MARK: 頁首
+
+    private var channel: Channel? {
+        if case .channel(let id) = item { return library.channels.first { $0.id == id } }
+        return nil
+    }
+
+    private var pageColor: Color {
+        if let channel {
+            return ArtworkPalette.shared.color(for: channel.avatar) ?? item.colors[1]
+        }
+        return item.colors[0]
+    }
+
+    private func header(_ episodes: [Episode]) -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(alignment: .bottom, spacing: 24) {
+                cover
+                    .frame(width: 168, height: 168)
+                    .shadow(color: .black.opacity(0.5), radius: 24, y: 12)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(channel == nil ? "清單" : "頻道")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text(headerTitle)
+                        .font(.system(size: 54, weight: .black))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.4)
+                        .foregroundStyle(.white)
+                    Text(subtitle(episodes))
+                        .font(.callout)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(2)
+                }
+                .padding(.bottom, 4)
+            }
+            HStack(spacing: 20) {
+                if let target = playTarget(episodes) {
+                    let ownsCurrent = player.current.map { cur in episodes.contains { $0.id == cur.id } } ?? false
+                    PlayCircle(size: 56, playing: ownsCurrent && player.isPlaying,
+                               loading: ownsCurrent && player.isLoading) {
+                        if ownsCurrent { player.toggle() } else { player.play(target) }
+                    }
+                    .help(ownsCurrent ? "播放／暫停（空白鍵、⌘↩）" : "從「\(target.title)」開始播")
+                }
+                if let channel {
+                    Menu { ChannelMenu(channel: channel) } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.title2.weight(.semibold))
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(GlyphButtonStyle())
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("頻道設定")
+                }
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 28)
+        .padding(.bottom, 10)
+    }
+
+    @ViewBuilder private var cover: some View {
+        if let channel {
+            Thumbnail(url: channel.avatar, cornerRadius: 84)
+        } else {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(LinearGradient(colors: item.colors, startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay {
+                    Image(systemName: item.symbol)
+                        .font(.system(size: 64, weight: .bold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                }
+        }
+    }
+
+    /// 頁首的大播放鍵從哪一集開始：第一部還沒聽完的。
+    private func playTarget(_ episodes: [Episode]) -> Episode? {
+        episodes.first { !library.finished.contains($0.id) } ?? episodes.first
+    }
+
+    /// Spotify 式的欄位標題：編號、標題、長度。
+    private var columnHeader: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 14) {
+                Text("#").frame(width: 28)
+                Text("標題")
+                Spacer()
+                Image(systemName: "clock").frame(width: 84, alignment: .trailing)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            Rectangle().fill(.white.opacity(0.08)).frame(height: 1)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
+    }
+
+    // MARK: 空的時候
 
     @ViewBuilder private var empty: some View {
         switch item {
@@ -323,6 +510,12 @@ struct EpisodeList: View {
         }
     }
 
+    /// 頁首的大標題。搜尋頁直接放關鍵字。
+    private var headerTitle: String {
+        if item == .search, !library.searchQuery.isEmpty { return String(localized: "「\(library.searchQuery)」") }
+        return title
+    }
+
     private func subtitle(_ episodes: [Episode]) -> String {
         if item == .subscriptions, let error = library.channelErrors[YTDLP.subscriptionsURL] { return String(localized: "更新失敗：\(error)") }
         if item == .subscriptions, let fetched = library.subscriptionsFetched {
@@ -336,83 +529,236 @@ struct EpisodeList: View {
     }
 }
 
+// MARK: - 橫向卡片列
+
+/// 首頁上方一排可以左右捲的卡片（正在直播、繼續聽）。
+struct Shelf: View {
+    let title: LocalizedStringKey
+    let episodes: [Episode]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.title2.bold())
+                .padding(.horizontal, 28)
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 6) {
+                    ForEach(episodes) { EpisodeCard(episode: $0) }
+                }
+                .padding(.horizontal, 18)
+            }
+        }
+        .padding(.top, 14)
+    }
+}
+
+struct EpisodeCard: View {
+    @Environment(Library.self) private var library
+    @Environment(Player.self) private var player
+    let episode: Episode
+    @State private var hovering = false
+
+    var body: some View {
+        let isCurrent = player.current?.id == episode.id
+        let progress = library.progress[episode.id]
+        VStack(alignment: .leading, spacing: 8) {
+            Thumbnail(url: episode.thumbnail, cornerRadius: 8)
+                .aspectRatio(16 / 9, contentMode: .fit)
+                .overlay(alignment: .bottom) {
+                    if let progress, let d = episode.duration, d > 0 {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Rectangle().fill(.black.opacity(0.5))
+                                Rectangle().fill(Theme.amber).frame(width: geo.size.width * min(progress / d, 1))
+                            }
+                        }
+                        .frame(height: 4)
+                        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8))
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    if episode.liveNow {
+                        Text("● 直播中")
+                            .font(.caption2.weight(.heavy))
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Theme.live, in: Capsule())
+                            .foregroundStyle(.white)
+                            .padding(6)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    PlayCircle(size: 40, playing: isCurrent && player.isPlaying) {
+                        if isCurrent { player.toggle() } else { player.play(episode) }
+                    }
+                    .padding(10)
+                    .opacity(hovering || isCurrent ? 1 : 0)
+                    .offset(y: hovering || isCurrent ? 0 : 8)
+                }
+                .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(episode.title)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(isCurrent ? Theme.amber : .white)
+                    .lineLimit(2, reservesSpace: true)
+                Group {
+                    if let progress, let d = episode.duration, d > progress {
+                        Text("\(episode.channelTitle) · 剩 \(Format.time(d - progress))")
+                    } else {
+                        Text(episode.channelTitle)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+        }
+        .frame(width: 210)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(hovering ? Theme.hover : .clear))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
+        .onTapGesture {
+            if isCurrent { player.toggle() } else { player.play(episode) }
+        }
+        .contextMenu { EpisodeMenu(episode: episode) }
+    }
+}
+
+// MARK: - 清單的一列
+
 struct EpisodeRow: View {
     @Environment(Library.self) private var library
     @Environment(Player.self) private var player
     let episode: Episode
+    var index = 0
+    /// 頻道頁每一列都是同一個頻道，不用再寫。
+    var showChannel = true
+    @State private var hovering = false
 
     var body: some View {
         let finished = library.finished.contains(episode.id)
         let progress = library.progress[episode.id]
         let isCurrent = player.current?.id == episode.id
-        HStack(spacing: 12) {
-            AsyncImage(url: episode.thumbnail) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                Rectangle().fill(.quaternary)
-            }
-            .frame(width: 112, height: 63)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay(alignment: .bottomTrailing) {
-                if episode.liveNow {
-                    Text("● 直播中")
-                        .font(.caption2.weight(.bold))
-                        .padding(.horizontal, 4).padding(.vertical, 1)
-                        .background(.red, in: RoundedRectangle(cornerRadius: 3))
+        let queued = library.queue.contains(episode.id)
+        HStack(spacing: 14) {
+            Group {
+                if hovering {
+                    Image(systemName: isCurrent && player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.callout)
                         .foregroundStyle(.white)
-                        .padding(4)
-                } else if let d = episode.duration {
-                    Text(Format.time(d))
-                        .font(.timecodeSmall.weight(.semibold))
-                        .padding(.horizontal, 4).padding(.vertical, 1)
-                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 3))
-                        .foregroundStyle(.white)
-                        .padding(4)
+                } else if isCurrent {
+                    EqualizerBars(playing: player.isPlaying)
+                } else {
+                    Text(index, format: .number)
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
                 }
             }
+            .frame(width: 28)
 
-            VStack(alignment: .leading, spacing: 4) {
+            Thumbnail(url: episode.thumbnail, cornerRadius: 6)
+                .frame(width: 104, height: 58)
+                .overlay(alignment: .bottomLeading) {
+                    if episode.liveNow {
+                        Text("● 直播中")
+                            .font(.caption2.weight(.heavy))
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Theme.live, in: Capsule())
+                            .foregroundStyle(.white)
+                            .padding(4)
+                    }
+                }
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(episode.title)
-                    .font(.body.weight(isCurrent ? .semibold : .regular))
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(isCurrent ? Theme.amber : .white)
                     .lineLimit(2)
                 HStack(spacing: 6) {
-                    Text(episode.channelTitle)
-                    if let date = episode.published {
-                        Text("·")
-                        Text(date, format: .relative(presentation: .named))
-                    }
                     if episode.isStream && !episode.liveNow {
                         Text("直播回放")
-                            .padding(.horizontal, 4)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 3))
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 3))
                     }
-                    if library.queue.contains(episode.id) {
-                        Image(systemName: "list.bullet").help("在待播清單裡")
+                    if showChannel {
+                        Text(episode.channelTitle)
+                    }
+                    if let date = episode.published {
+                        if showChannel { Text("·") }
+                        Text(date, format: .relative(presentation: .named))
                     }
                 }
-                .font(.caption)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
                 if let progress, let d = episode.duration, d > 0 {
-                    HStack(spacing: 6) {
-                        ProgressView(value: min(progress, d), total: d)
-                            .frame(maxWidth: 160)
-                        Text("剩 \(Format.time(d - progress))")
+                    HStack(spacing: 8) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(.white.opacity(0.14))
+                                Capsule().fill(Theme.amber).frame(width: max(3, geo.size.width * min(progress / d, 1)))
+                            }
+                        }
+                        .frame(width: 120, height: 3)
+                        Text("剩 \(Format.time(max(0, d - progress)))")
                             .font(.timecodeSmall)
                             .foregroundStyle(.secondary)
                     }
+                    .padding(.top, 2)
                 }
             }
-            Spacer(minLength: 8)
-            if isCurrent {
-                Image(systemName: player.isPlaying ? "speaker.wave.2.fill" : "pause.fill")
-                    .foregroundStyle(.tint)
-            } else if finished {
-                Image(systemName: "checkmark.circle")
-                    .foregroundStyle(.secondary)
-                    .help("聽完了")
+            Spacer(minLength: 12)
+
+            // 滑鼠移上去才出現的按鈕；已經在待播清單裡的，琥珀色的勾一直留著。
+            HStack(spacing: 10) {
+                Button {
+                    if queued { library.dequeue(episode.id) } else { library.enqueue(episode.id) }
+                } label: {
+                    Image(systemName: queued ? "text.badge.checkmark" : "text.badge.plus")
+                        .font(.body)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(GlyphButtonStyle(active: queued))
+                .help(queued ? "移出待播清單" : "加到待播清單")
+                .opacity(hovering || queued ? 1 : 0)
+
+                Menu { EpisodeMenu(episode: episode) } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.button)
+                .buttonStyle(GlyphButtonStyle())
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .opacity(hovering ? 1 : 0)
             }
+
+            HStack(spacing: 6) {
+                if finished {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.amber)
+                        .help("聽完了")
+                }
+                if episode.liveNow {
+                    Text("直播").foregroundStyle(Theme.live)
+                } else if let d = episode.duration {
+                    Text(Format.time(d))
+                }
+            }
+            .font(.timecode)
+            .foregroundStyle(.secondary)
+            .frame(width: 84, alignment: .trailing)
         }
-        .padding(.vertical, 4)
-        .opacity(finished && !isCurrent ? 0.5 : 1)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(hovering ? Theme.hover : isCurrent ? Color.white.opacity(0.04) : .clear))
+        .opacity(finished && !isCurrent && !hovering ? 0.5 : 1)
+        .padding(.horizontal, 16)
+        .onHover { hovering = $0 }
     }
 }
