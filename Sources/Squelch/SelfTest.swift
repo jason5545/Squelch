@@ -1,5 +1,7 @@
+import AppKit
 import AVFoundation
 import Foundation
+import MediaPlayer
 
 /// `Squelch.app/Contents/MacOS/Squelch --selftest`：不開視窗，實際連 YouTube 跑一次核心流程。
 /// 驗證：網址解析、頻道清單、HLS 與下載備援兩條播放路徑（長度、開播、跳到中段、2 倍速）、SponsorBlock 查詢、存檔。
@@ -26,6 +28,15 @@ enum SelfTest {
         check(ChannelInput.videoID("https://www.youtube.com/live/abc-EF_2345") == "abc-EF_2345", "videoID live")
         check(Format.time(3725) == "1:02:05" && Format.time(65) == "1:05", "format time")
         check(Format.rate(1.5) == "1.5×" && Format.rate(2) == "2×", "format rate")
+
+        let artwork = NowPlaying.makeArtwork(NSImage(size: NSSize(width: 32, height: 18)))
+        // 要用 async：sync 會直接在呼叫端（主執行緒）跑，測不到。
+        let fromBackground = await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                continuation.resume(returning: !Thread.isMainThread && artwork.image(at: CGSize(width: 32, height: 18)) != nil)
+            }
+        }
+        check(fromBackground, "Now Playing artwork can be read from a background thread")
 
         print("yt-dlp: \(YTDLP.binaryPath() ?? "missing") \(await YTDLP.version() ?? "")")
 

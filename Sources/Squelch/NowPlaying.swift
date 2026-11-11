@@ -12,7 +12,8 @@ final class NowPlaying {
         self.player = player
         let center = MPRemoteCommandCenter.shared()
         func on(_ command: MPRemoteCommand, _ action: @escaping @MainActor (Player, MPRemoteCommandEvent) -> Void) {
-            command.addTarget { [weak player] event in
+            // @Sendable：系統可能在背景執行緒呼叫，不能綁在主執行緒（見 artwork 的說明）。
+            command.addTarget { @Sendable [weak player] event in
                 nonisolated(unsafe) let event = event
                 Task { @MainActor in
                     if let player { action(player, event) }
@@ -60,6 +61,12 @@ final class NowPlaying {
         if artworkID != ep.id { loadArtwork(for: ep) }
     }
 
+    /// MediaPlayer 在自己的背景佇列取縮圖。closure 若綁在主執行緒（預設 MainActor 隔離），
+    /// Swift 的執行時檢查會直接讓 App 當掉（0.2.1 實際發生）。所以標成 @Sendable。自我測試會從背景執行緒呼叫它。
+    static func makeArtwork(_ image: NSImage) -> MPMediaItemArtwork {
+        MPMediaItemArtwork(boundsSize: image.size) { @Sendable _ in image }
+    }
+
     private func loadArtwork(for ep: Episode) {
         artworkID = ep.id
         artwork = nil
@@ -67,7 +74,7 @@ final class NowPlaying {
         Task {
             guard let (data, _) = try? await URLSession.shared.data(from: url),
                   let image = NSImage(data: data), artworkID == ep.id else { return }
-            artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            artwork = Self.makeArtwork(image)
             update()
         }
     }

@@ -61,7 +61,8 @@ final class Player {
                 self.didFinish()
             }
         }
-        controlObservation = avPlayer.observe(\.timeControlStatus) { [weak self] player, _ in
+        // KVO、seek 完成的回呼可能在背景執行緒，closure 一律 @Sendable，再切回主執行緒。
+        controlObservation = avPlayer.observe(\.timeControlStatus) { @Sendable [weak self] player, _ in
             let waiting = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
             Task { @MainActor in self?.isBuffering = waiting }
         }
@@ -142,7 +143,7 @@ final class Player {
         item.audioTimePitchAlgorithm = .timeDomain
         item.preferredForwardBufferDuration = 120
         pendingSeek = seconds > 1 && !isLive ? seconds : nil
-        statusObservation = item.observe(\.status) { [weak self] item, _ in
+        statusObservation = item.observe(\.status) { @Sendable [weak self] item, _ in
             let status = item.status
             let message = item.error?.localizedDescription
             Task { @MainActor in self?.itemStatusChanged(status, message) }
@@ -170,7 +171,7 @@ final class Player {
             if !isLive, let d = avPlayer.currentItem?.duration.seconds, d.isFinite, d > 0 { duration = d }
             if let target = pendingSeek {
                 pendingSeek = nil
-                avPlayer.seek(to: CMTime(seconds: target, preferredTimescale: 600)) { [weak self] _ in
+                avPlayer.seek(to: CMTime(seconds: target, preferredTimescale: 600)) { @Sendable [weak self] _ in
                     Task { @MainActor in self?.beginPlayback() }
                 }
             } else {
