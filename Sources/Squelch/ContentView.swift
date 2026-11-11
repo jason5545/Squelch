@@ -88,17 +88,22 @@ struct Sidebar: View {
 
     var body: some View {
         List(selection: $selection) {
+            // `.tag` 一定要放在最後（`.badge` 之後）。寫成 `.tag(...).badge(...)` 時 tag 被包在裡面，
+            // List 讀不到，有數字的列（直播中、訂閱動態、聽到一半、待播清單）點了都選不到。
             Label("最新", systemImage: "tray.full").tag(SidebarItem.latest)
-            Label("直播中", systemImage: "dot.radiowaves.left.and.right").tag(SidebarItem.live)
+            Label("直播中", systemImage: "dot.radiowaves.left.and.right")
                 .badge(library.list(for: .live).count)
+                .tag(SidebarItem.live)
             Label("搜尋結果", systemImage: "magnifyingglass").tag(SidebarItem.search)
-            // 0.2.0 這一列是登入後才插入、外面包 HStack，點了沒反應；改成一律顯示、跟其他列同樣的結構。
-            Label("訂閱動態", systemImage: "person.2.wave.2").tag(SidebarItem.subscriptions)
+            Label("訂閱動態", systemImage: "person.2.wave.2")
                 .badge(account.isLoggedIn ? library.list(for: .subscriptions).filter(\.liveNow).count : 0)
-            Label("聽到一半", systemImage: "clock.arrow.circlepath").tag(SidebarItem.inProgress)
+                .tag(SidebarItem.subscriptions)
+            Label("聽到一半", systemImage: "clock.arrow.circlepath")
                 .badge(library.progress.count)
-            Label("待播清單", systemImage: "list.bullet").tag(SidebarItem.queue)
+                .tag(SidebarItem.inProgress)
+            Label("待播清單", systemImage: "list.bullet")
                 .badge(library.queue.count)
+                .tag(SidebarItem.queue)
             Label("觀看記錄", systemImage: "clock").tag(SidebarItem.history)
             Section("頻道") {
                 ForEach(library.channels) { channel in
