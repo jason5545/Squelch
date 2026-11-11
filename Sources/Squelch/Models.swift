@@ -51,6 +51,8 @@ nonisolated struct ResolvedStream: Sendable {
 
 nonisolated enum SidebarItem: Hashable, Sendable {
     case latest
+    case search
+    case history
     case subscriptions
     case inProgress
     case queue

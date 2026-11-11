@@ -7,6 +7,7 @@ enum Snapshot {
     static func render(to url: URL, item: SidebarItem = .latest) async {
         let library = Library()
         if library.episodes.isEmpty { await library.refresh() }
+        if item == .search { await library.search("WWDC SwiftUI") }
         let player = Player(library: library)
         if let ep = library.list(for: .latest).first {
             player.current = ep

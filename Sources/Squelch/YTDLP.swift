@@ -95,7 +95,8 @@ nonisolated enum YTDLP {
         return try parseTab(data, channelID: channelID, isStream: isStream)
     }
 
-    static func parseTab(_ data: Data, channelID: String, isStream: Bool) throws -> ChannelFeed {
+    /// `mixed`：訂閱動態、搜尋、觀看記錄這種混了很多頻道的清單，頻道資訊要從每一筆拿。
+    static func parseTab(_ data: Data, channelID: String, isStream: Bool, mixed: Bool = false) throws -> ChannelFeed {
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw YTDLPError.badOutput }
         let title = (obj["channel"] as? String) ?? (obj["uploader"] as? String) ?? channelID
         let thumbs = obj["thumbnails"] as? [[String: Any]] ?? []
@@ -112,9 +113,8 @@ nonisolated enum YTDLP {
             // 估計時間只到「幾天前」，同一天的會撞在一起；減掉在清單裡的位置秒數，保留頻道頁的先後順序。
             let position = Double(episodes.count)
             let published = (entry["timestamp"] as? NSNumber).map { Date(timeIntervalSince1970: $0.doubleValue - position) }
-            // 訂閱動態混了很多頻道，頻道資訊要從每一筆拿。
             var epChannelID = channelID, epChannelTitle = title
-            if channelID == subscriptionsURL {
+            if mixed {
                 epChannelID = ""   // 少數項目（例如首播）yt-dlp 不給頻道 ID，只有名稱。
                 if let handle = entry["uploader_id"] as? String, handle.hasPrefix("@") {
                     epChannelID = "https://www.youtube.com/\(handle)"
@@ -140,7 +140,22 @@ nonisolated enum YTDLP {
             "--extractor-args", "youtubetab:approximate_date",
             "--socket-timeout", "15", subscriptionsURL,
         ], cookies: cookies)
-        return try parseTab(data, channelID: subscriptionsURL, isStream: false).episodes
+        return try parseTab(data, channelID: subscriptionsURL, isStream: false, mixed: true).episodes
+    }
+
+    // MARK: 搜尋（不帶帳號）、觀看記錄（要登入）
+
+    static func search(_ query: String, limit: Int = 30) async throws -> [Episode] {
+        let data = try await run(["--flat-playlist", "-J", "--socket-timeout", "15", "ytsearch\(limit):\(query)"])
+        return try parseTab(data, channelID: "", isStream: false, mixed: true).episodes
+    }
+
+    static let historyURL = "https://www.youtube.com/feed/history"
+
+    static func history(cookies: URL, limit: Int = 60) async throws -> [Episode] {
+        let data = try await run(["--flat-playlist", "-J", "-I", "1:\(limit)", "--socket-timeout", "15", historyURL],
+                                 cookies: cookies)
+        return try parseTab(data, channelID: historyURL, isStream: false, mixed: true).episodes
     }
 
     // MARK: 音軌

@@ -16,6 +16,8 @@
 - SponsorBlock 自動跳過贊助片段（設定裡可再開自我宣傳、訂閱提醒）
 - 控制中心的「正在播放」、媒體鍵、耳機按鍵
 - 關掉視窗照樣在背景播，選單列有控制
+- 搜尋 YouTube（工具列，按 Enter 才查），右鍵可以把結果的頻道加進來
+- 觀看記錄：登入時是 YouTube 的觀看記錄（手機上看的也在），沒登入是 Squelch 自己的播放記錄
 - 貼影片網址直接播（直播回放、沒訂閱的頻道）
 - 正在直播的會標「直播中」排在最上面，可以直接聽
 - 登入 YouTube（選用）：多一個「訂閱動態」，播放紀錄和進度會回報給 YouTube，網頁版和手機可以接著看
@@ -63,12 +65,13 @@ AVPlayer 的音量最大 100%，要更大聲只能在音訊路徑上加增益（
 
 做法參考 [Kaset](https://github.com/sozercan/kaset)：App 內開 Google 登入頁，cookie 存在 Squelch 自己的 WebKit 資料區，跟瀏覽器分開。登入頁會藏掉 passkey（內嵌網頁的 passkey 一定失敗，見 Kaset ADR-0033），Google 會改走密碼。
 
-帳號只用在兩件事：
+帳號只用在三件事：
 
 - 訂閱動態：`yt-dlp --cookies` 抓 `youtube.com/feed/subscriptions`，每 30 分鐘一次。yt-dlp 跑完會把輪換過的 cookie 寫回檔案，Squelch 再讀回 WebKit。
+- 觀看記錄：`yt-dlp --cookies` 抓 `youtube.com/feed/history`，只在打開清單或按重新整理時抓。
 - 播放紀錄：從登入狀態的影片頁取得 `playbackTracking` 的兩個回報網址，開始播時送 `videostatsPlaybackUrl`（進觀看記錄），播放中每 20 秒和暫停、跳轉時送 `videostatsWatchtimeUrl`（帶真正的位置）。參數照 yt-dlp 的 `_mark_watched`，但不會一律標成看完。
 
-解析音軌不帶帳號。yt-dlp 官方提醒：帳號搭配 yt-dlp 有被封鎖（暫時或永久）的風險，所以帶帳號的請求越少越好。
+解析音軌和搜尋不帶帳號。yt-dlp 官方提醒：帳號搭配 yt-dlp 有被封鎖（暫時或永久）的風險，所以帶帳號的請求越少越好。
 
 ## 資料
 

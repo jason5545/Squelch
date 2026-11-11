@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var showingAddChannel = false
     @State private var showingPlayURL = false
     @State private var showingLogin = false
+    @State private var searchText = ""
 
     var body: some View {
         NavigationSplitView {
@@ -46,7 +47,10 @@ struct ContentView: View {
                 Button { showingAddChannel = true } label: { Label("加入頻道", systemImage: "plus") }
                     .help("加入頻道")
                 Button {
-                    Task { await library.refresh() }
+                    Task {
+                        if selection == .history { await library.loadHistory() }
+                        await library.refresh()
+                    }
                 } label: {
                     if library.refreshing {
                         ProgressView().controlSize(.small)
@@ -57,6 +61,12 @@ struct ContentView: View {
                 .help(library.lastRefresh.map { "上次更新：\($0.formatted(date: .omitted, time: .shortened))" } ?? "重新整理")
                 .disabled(library.refreshing)
             }
+        }
+        // 按 Enter 才搜尋，打字當下不查，免得一直呼叫 yt-dlp。
+        .searchable(text: $searchText, placement: .toolbar, prompt: "搜尋 YouTube")
+        .onSubmit(of: .search) {
+            selection = .search
+            Task { await library.search(searchText) }
         }
         .sheet(isPresented: $showingAddChannel) { AddChannelSheet() }
         .sheet(isPresented: $showingPlayURL) { PlayURLSheet() }
@@ -77,6 +87,7 @@ struct Sidebar: View {
     var body: some View {
         List(selection: $selection) {
             Label("最新", systemImage: "tray.full").tag(SidebarItem.latest)
+            Label("搜尋結果", systemImage: "magnifyingglass").tag(SidebarItem.search)
             // 0.2.0 這一列是登入後才插入、外面包 HStack，點了沒反應；改成一律顯示、跟其他列同樣的結構。
             Label("訂閱動態", systemImage: "person.2.wave.2").tag(SidebarItem.subscriptions)
                 .badge(account.isLoggedIn ? library.list(for: .subscriptions).filter(\.liveNow).count : 0)
@@ -84,6 +95,7 @@ struct Sidebar: View {
                 .badge(library.progress.count)
             Label("待播清單", systemImage: "list.bullet").tag(SidebarItem.queue)
                 .badge(library.queue.count)
+            Label("觀看記錄", systemImage: "clock").tag(SidebarItem.history)
             Section("頻道") {
                 ForEach(library.channels) { channel in
                     ChannelRow(channel: channel).tag(SidebarItem.channel(channel.id))
@@ -155,6 +167,9 @@ struct EpisodeList: View {
         }
         .navigationTitle(title)
         .navigationSubtitle(subtitle(episodes))
+        .task(id: item) {
+            if item == .history { await library.loadHistory() }
+        }
     }
 
     private func row(_ ep: Episode) -> some View {
@@ -173,6 +188,12 @@ struct EpisodeList: View {
                 Button(library.finished.contains(ep.id) ? "標成沒聽過" : "標成聽完了") {
                     library.toggleFinished(ep.id)
                 }
+                if !ep.channelID.isEmpty, !library.channels.contains(where: { $0.id == ep.channelID }) {
+                    Divider()
+                    Button("加入頻道「\(ep.channelTitle.isEmpty ? "這個頻道" : ep.channelTitle)」") {
+                        Task { try? await library.addChannel(ep.channelID) }
+                    }
+                }
                 Divider()
                 Button("在 YouTube 開啟") { NSWorkspace.shared.open(ep.watchURL) }
                 Button("複製影片網址") {
@@ -189,6 +210,26 @@ struct EpisodeList: View {
                                    description: Text("在影片上按右鍵，選「加到待播清單」。"))
         case .inProgress:
             ContentUnavailableView("沒有聽到一半的", systemImage: "clock.arrow.circlepath")
+        case .search:
+            if library.searching {
+                ProgressView("搜尋「\(library.searchQuery)」…")
+            } else if let error = library.searchError {
+                ContentUnavailableView("搜尋失敗", systemImage: "exclamationmark.magnifyingglass", description: Text(error))
+            } else if !library.searchQuery.isEmpty {
+                ContentUnavailableView.search(text: library.searchQuery)
+            } else {
+                ContentUnavailableView("搜尋 YouTube", systemImage: "magnifyingglass",
+                                       description: Text("在右上角的搜尋框輸入關鍵字，按 Enter。"))
+            }
+        case .history:
+            if library.historyLoading {
+                ProgressView("正在抓觀看記錄…")
+            } else if let error = library.historyError {
+                ContentUnavailableView("抓不到觀看記錄", systemImage: "clock", description: Text(error))
+            } else {
+                ContentUnavailableView("還沒有觀看記錄", systemImage: "clock",
+                                       description: Text(account.isLoggedIn ? "按右上角的重新整理。" : "在 Squelch 聽過的影片會出現在這裡。登入後會顯示 YouTube 的觀看記錄。"))
+            }
         case .subscriptions:
             if !account.isLoggedIn {
                 ContentUnavailableView {
@@ -218,6 +259,8 @@ struct EpisodeList: View {
     private var title: String {
         switch item {
         case .latest: "最新"
+        case .search: library.searchQuery.isEmpty ? "搜尋結果" : "搜尋：\(library.searchQuery)"
+        case .history: "觀看記錄"
         case .subscriptions: "訂閱動態"
         case .inProgress: "聽到一半"
         case .queue: "待播清單"
@@ -227,6 +270,8 @@ struct EpisodeList: View {
 
     private func subtitle(_ episodes: [Episode]) -> String {
         if item == .subscriptions, let error = library.channelErrors[YTDLP.subscriptionsURL] { return "更新失敗：\(error)" }
+        if item == .history { return account.isLoggedIn ? "YouTube 觀看記錄（含手機）" : "Squelch 本機記錄" }
+        if item == .search, library.searching { return "搜尋中…" }
         let total = episodes.reduce(0) { $0 + ($1.duration ?? 0) }
         return episodes.isEmpty ? "" : "\(episodes.count) 部 · 共 \(Format.time(total))"
     }

@@ -9,7 +9,8 @@ enum Main {
         if let index = CommandLine.arguments.firstIndex(of: "--snapshot"), index + 1 < CommandLine.arguments.count {
             let path = CommandLine.arguments[index + 1]
             Task { @MainActor in
-                let item: SidebarItem = CommandLine.arguments.contains("--subscriptions") ? .subscriptions : .latest
+                let item: SidebarItem = CommandLine.arguments.contains("--subscriptions") ? .subscriptions
+                    : CommandLine.arguments.contains("--search") ? .search : .latest
                 await Snapshot.render(to: URL(fileURLWithPath: path), item: item)
                 exit(0)
             }

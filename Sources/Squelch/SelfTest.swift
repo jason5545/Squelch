@@ -165,6 +165,16 @@ enum SelfTest {
             check(false, "fetch watch page")
         }
 
+        do {
+            let results = try await YTDLP.search("WWDC SwiftUI")
+            check(results.count >= 10, "search returns \(results.count) results")
+            check(results.filter { !$0.channelTitle.isEmpty }.count >= results.count - 2
+                  && results.contains { $0.channelID.hasPrefix("https://www.youtube.com/") },
+                  "search results carry channel info")
+        } catch {
+            check(false, "search: \(error.localizedDescription)")
+        }
+
         // 已登入才測訂閱動態（只讀）。
         let cookieFile = Account.defaultCookieFile
         if FileManager.default.fileExists(atPath: cookieFile.path) {
@@ -174,6 +184,12 @@ enum SelfTest {
                 check(feed.allSatisfy { !$0.channelID.contains("/feed/") && !$0.channelTitle.isEmpty }, "subscription items carry their own channel")
             } catch {
                 check(false, "subscriptions: \(error.localizedDescription)")
+            }
+            do {
+                let history = try await YTDLP.history(cookies: cookieFile)
+                check(!history.isEmpty, "watch history: \(history.count) items")
+            } catch {
+                check(false, "history: \(error.localizedDescription)")
             }
         } else {
             print("info  not logged in, skipping subscriptions feed")

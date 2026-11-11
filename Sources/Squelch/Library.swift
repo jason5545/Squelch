@@ -12,6 +12,14 @@ final class Library {
     var finished: Set<String> = []
     var queue: [String] = []
     var subscriptionFeed: [String] = []
+    // 搜尋結果和觀看記錄只放在記憶體，不存檔；按播放時才記進 `episodes`。
+    var searchQuery = ""
+    var searchResults: [Episode] = []
+    var searching = false
+    var searchError: String?
+    var historyFeed: [Episode] = []
+    var historyLoading = false
+    var historyError: String?
     var lastRefresh: Date?
     var refreshing = false
     var channelErrors: [String: String] = [:]
@@ -163,6 +171,49 @@ final class Library {
         }
     }
 
+    // MARK: 搜尋、觀看記錄
+
+    func search(_ query: String) async {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
+        searchQuery = q
+        searching = true
+        searchError = nil
+        defer { searching = false }
+        do {
+            let results = try await YTDLP.search(q)
+            guard searchQuery == q else { return }
+            searchResults = results.map(merged)
+        } catch {
+            guard searchQuery == q else { return }
+            searchResults = []
+            searchError = error.localizedDescription
+        }
+    }
+
+    /// 登入時抓 YouTube 的觀看記錄（手機上看的也在）。只在打開清單或手動重新整理時抓，不跟著自動更新跑。
+    func loadHistory() async {
+        guard let account, account.isLoggedIn, !historyLoading else { return }
+        historyLoading = true
+        historyError = nil
+        defer { historyLoading = false }
+        do {
+            let items = try await YTDLP.history(cookies: account.cookieFile)
+            await account.importCookieFile()
+            historyFeed = items.map(merged)
+        } catch {
+            historyError = error.localizedDescription
+        }
+    }
+
+    /// 已經認得的影片用本機資料（有頻道名稱、日期），觀看記錄的項目常常沒有頻道名稱。
+    private func merged(_ ep: Episode) -> Episode {
+        guard var known = episodes[ep.id] else { return ep }
+        known.isLive = ep.isLive ?? known.isLive
+        if known.duration == nil { known.duration = ep.duration }
+        return known
+    }
+
     // MARK: 頻道
 
     func addChannel(_ input: String) async throws {
@@ -279,6 +330,11 @@ final class Library {
         case .latest:
             return episodes.values.filter { ep in channels.contains { $0.id == ep.channelID } }
                 .sorted { a, b in a.liveNow != b.liveNow ? a.liveNow : Self.newestFirst(a, b) }
+        case .search:
+            return searchResults
+        case .history:
+            if account?.isLoggedIn == true { return historyFeed }
+            return lastPlayed.sorted { $0.value > $1.value }.compactMap { episodes[$0.key] }
         case .subscriptions:
             guard account?.isLoggedIn == true else { return [] }
             return subscriptionFeed.compactMap { episodes[$0] }
