@@ -18,6 +18,15 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             Sidebar(selection: $selection)
+                // 搜尋框放在側欄上方（像 Apple Music）。一定要掛在側欄這一欄：掛在整個視窗上時，
+                // 工具列最右邊還會多一個，橫跨整個「正在播放」面板（截圖程式會列出搜尋框在哪）。
+                // 按 Enter 才搜尋，打字當下不查，免得一直呼叫 yt-dlp。
+                .searchable(text: $searchText, placement: .sidebar, prompt: "搜尋 YouTube")
+                .onSubmit(of: .search) {
+                    selection = .search
+                    Task { await library.search(searchText) }
+                }
+                // 欄寬要放最外層，包在 .searchable 裡面會失效，側欄被擠到約 144 點。
                 .navigationSplitViewColumnWidth(min: 210, ideal: 240)
         } detail: {
             EpisodeList(item: selection ?? .latest)
@@ -76,13 +85,6 @@ struct ContentView: View {
                 .help(library.lastRefresh.map { String(localized: "上次更新：\($0.formatted(date: .omitted, time: .shortened))") } ?? String(localized: "重新整理"))
                 .disabled(library.refreshing)
             }
-        }
-        // 按 Enter 才搜尋，打字當下不查，免得一直呼叫 yt-dlp。
-        // 放在側欄上方（像 Apple Music）：放工具列時會被排到最右邊，橫跨整個「正在播放」面板。
-        .searchable(text: $searchText, placement: .sidebar, prompt: "搜尋 YouTube")
-        .onSubmit(of: .search) {
-            selection = .search
-            Task { await library.search(searchText) }
         }
         .sheet(isPresented: $showingAddChannel) { AddChannelSheet() }
         .sheet(isPresented: $showingPlayURL) { PlayURLSheet() }

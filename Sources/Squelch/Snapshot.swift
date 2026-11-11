@@ -33,6 +33,8 @@ enum Snapshot {
             .environment(Account(checkWebKit: false))
             .frame(width: size.width, height: size.height)
         let host = NSHostingView(rootView: view)
+        // 把工具列接到視窗上，截圖後才能列出工具列裡有什麼（工具列畫在視窗框上，PNG 裡看不到）。
+        host.sceneBridgingOptions = [.toolbars, .title]
         host.frame = NSRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: host.frame, styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
@@ -45,5 +47,21 @@ enum Snapshot {
         host.cacheDisplay(in: host.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
         print("snapshot: \(url.path)")
+        printSearchFields(in: window)
+    }
+
+    /// 列出視窗裡的搜尋框在哪：工具列裡的、內容裡的（側欄上方那種），各幾個、多寬、x 在哪。
+    private static func printSearchFields(in window: NSWindow) {
+        for item in window.toolbar?.items ?? [] where item is NSSearchToolbarItem {
+            print("toolbar search: \(item.itemIdentifier.rawValue)")
+        }
+        func walk(_ view: NSView) {
+            if view is NSSearchField {
+                let frame = view.convert(view.bounds, to: nil)
+                print("search field: x=\(Int(frame.minX)) width=\(Int(frame.width)) in \(type(of: view.superview ?? view))")
+            }
+            view.subviews.forEach(walk)
+        }
+        if let root = window.contentView?.superview { walk(root) }
     }
 }
