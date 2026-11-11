@@ -35,6 +35,7 @@ make run        # 建置後打開
 make selftest   # 不開視窗，實際連 YouTube 跑核心流程
 scripts/release.sh 0.1.0   # Developer ID 簽章＋公證，產出 build/dist/Squelch-0.1.0.zip
 scripts/install.sh 0.1.0   # 裝到 /Applications/Squelch.app
+scripts/ship.sh            # 一鍵：小版號加一、發公證版、安裝、打 git tag（T3 的「發版並安裝」按鈕）
 ```
 
 ## 怎麼播的
