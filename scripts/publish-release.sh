@@ -15,9 +15,9 @@ trap 'rm -rf "$STAGE"' EXIT
 cp "$ZIP" "$STAGE/Squelch.zip"
 
 {
-    echo "Developer ID 簽章、Apple 公證。需要 macOS 26（Apple Silicon），以及 \`brew install yt-dlp deno\`。"
+    echo "Developer ID 簽章、Apple 公證。需要 macOS 26（Apple Silicon）。yt-dlp 和 deno 已經包在 App 裡，不用另外安裝。"
     echo
-    echo "Signed with Developer ID and notarized by Apple. Requires macOS 26 on Apple Silicon and \`brew install yt-dlp deno\`."
+    echo "Signed with Developer ID and notarized by Apple. Requires macOS 26 on Apple Silicon. yt-dlp and deno are included; nothing else to install."
     echo
     echo "## 這一版"
     echo

@@ -48,6 +48,7 @@ enum SelfTest {
         unity.withUnsafeMutableBufferPointer { Boost.process($0.baseAddress!, count: $0.count, gain: 1) }
         check(unity == [0.3, -0.9], "boost at 100% leaves audio untouched")
 
+        await tools()
         print("yt-dlp: \(YTDLP.binaryPath() ?? "missing") \(await YTDLP.version() ?? "")")
 
         var episode: Episode?
@@ -96,6 +97,57 @@ enum SelfTest {
         persistence(channel: channel)
         print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
         return failures == 0
+    }
+
+    /// 內建的 yt-dlp 和 deno、自動更新。整個自我測試都不准用 Homebrew 的 yt-dlp，PATH 也沒有 Homebrew。
+    private static func tools() async {
+        YTDLP.allowHomebrew.store(false, ordering: .relaxed)
+        YTDLPUpdate.automatic.store(false, ordering: .relaxed)
+        let bundled = YTDLP.bundledDirectory.flatMap { YTDLP.installed(in: $0, source: .bundled) }
+        check(bundled?.version?.isEmpty == false, "tools: yt-dlp inside the app: \(bundled?.version ?? "missing")")
+        let deno = YTDLP.helpersDirectory.appendingPathComponent("deno").path
+        check(FileManager.default.isExecutableFile(atPath: deno), "tools: deno inside the app")
+        let custom = UserDefaults.standard.string(forKey: YTDLP.customPathKey) ?? ""
+        if custom.isEmpty {
+            let source = YTDLP.binary()?.source
+            check(source == .bundled || source == .updated, "tools: uses the built-in or auto-updated yt-dlp (\(String(describing: source)))")
+        } else {
+            print("info  tools: custom yt-dlp path \(custom)")
+        }
+        if let path = YTDLP.binaryPath() {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: path)
+            process.arguments = ["-v", "--simulate", "--flat-playlist", "-I", "1:1", "https://www.youtube.com/@AppleDeveloper/videos"]
+            process.environment = YTDLP.environment()
+            let err = Pipe()
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = err
+            let p = process
+            let text = await Task.detached {
+                try? p.run()
+                let data = err.fileHandleForReading.readDataToEndOfFile()
+                p.waitUntilExit()
+                return String(decoding: data, as: UTF8.self)
+            }.value
+            let line = text.split(separator: "\n").first { $0.contains("JS runtimes") }.map(String.init) ?? "none"
+            check(line.contains("deno"), "tools: yt-dlp finds the built-in deno: \(line)")
+        }
+
+        check(YTDLPUpdate.isNewer("2026.11.2", than: "2026.10.26") && YTDLPUpdate.isNewer("2026.10.26.1", than: "2026.10.26")
+              && !YTDLPUpdate.isNewer("2026.10.26", than: "2026.10.26") && !YTDLPUpdate.isNewer("2025.12.31", than: "2026.1.1"),
+              "tools: version comparison")
+        let started = Date()
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-selftest-ytdlp-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        do {
+            let latest = try await YTDLPUpdate.latestVersion()
+            try await YTDLPUpdate.install(version: latest, into: dir)
+            let installed = YTDLP.installed(in: dir, source: .updated)
+            check(installed?.version == latest,
+                  "tools: update downloads, verifies and runs yt-dlp \(latest) (\(fixed(Date().timeIntervalSince(started)))s)")
+        } catch {
+            check(false, "tools: update: \(error.localizedDescription)")
+        }
     }
 
     private static func playback(_ stream: ResolvedStream, duration: Double, label: String) async {

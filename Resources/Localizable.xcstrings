@@ -214,6 +214,34 @@
     "Squelch": {
       "shouldTranslate": false
     },
+    "Squelch 內建 yt-dlp 和它需要的 deno，不用另外安裝。YouTube 一改版舊的 yt-dlp 就抓不到，所以每天會到 GitHub 查一次，有新版就自動下載到「~/Library/Application Support/Squelch/yt-dlp」。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Squelch includes yt-dlp and the deno runtime it needs, so there is nothing else to install. Old versions of yt-dlp stop working whenever YouTube changes, so Squelch checks GitHub once a day and downloads new versions to “~/Library/Application Support/Squelch/yt-dlp”."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Squelch には yt-dlp と、それに必要な deno が入っているので、別途インストールは不要です。YouTube が仕様を変えると古い yt-dlp は動かなくなるため、1 日 1 回 GitHub を確認し、新しい版があれば「~/Library/Application Support/Squelch/yt-dlp」に自動でダウンロードします。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Squelch 内置 yt-dlp 和它需要的 deno，不用另外安装。YouTube 一改版旧的 yt-dlp 就抓不到，所以每天会到 GitHub 查一次，有新版就自动下载到“~/Library/Application Support/Squelch/yt-dlp”。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Squelch 內建 yt-dlp 和它需要的 deno，不用另外安裝。YouTube 一改版舊的 yt-dlp 就抓不到，所以每天會到 GitHub 查一次，有新版就自動下載到「~/Library/Application Support/Squelch/yt-dlp」。"
+          }
+        }
+      }
+    },
     "Squelch 本機記錄": {
       "localizations": {
         "en": {
@@ -304,6 +332,118 @@
     "yt-dlp": {
       "shouldTranslate": false
     },
+    "yt-dlp 新版下載失敗。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't download the new version of yt-dlp."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp の新しい版をダウンロードできませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp 新版下载失败。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp 新版下載失敗。"
+          }
+        }
+      }
+    },
+    "yt-dlp 新版的雜湊值不符，沒有換上去。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new version of yt-dlp failed its checksum and was not installed."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp の新しい版のハッシュ値が一致しないため、入れ替えませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp 新版的哈希值不符，没有换上去。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp 新版的雜湊值不符，沒有換上去。"
+          }
+        }
+      }
+    },
+    "yt-dlp 新版的雜湊值抓不到。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't get the checksum for the new version of yt-dlp."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp の新しい版のハッシュ値を取得できませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp 新版的哈希值抓不到。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp 新版的雜湊值抓不到。"
+          }
+        }
+      }
+    },
+    "yt-dlp 新版跑不起來（回報版本 %@）。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The new version of yt-dlp doesn't run (it reported version %@)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp の新しい版が起動しません（報告されたバージョン %@）。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp 新版跑不起来（回报版本 %@）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp 新版跑不起來（回報版本 %@）。"
+          }
+        }
+      }
+    },
     "yt-dlp 的輸出看不懂。": {
       "localizations": {
         "en": {
@@ -356,34 +496,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "yt-dlp 結束代碼 %d"
-          }
-        }
-      }
-    },
-    "yt-dlp 要常更新，YouTube 一改版舊版就抓不到：`brew upgrade yt-dlp`。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Keep yt-dlp up to date. Older versions break whenever YouTube changes something: `brew upgrade yt-dlp`."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "yt-dlp はこまめに更新してください。YouTube が変更されると古いバージョンでは取得できなくなります：`brew upgrade yt-dlp`"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "yt-dlp 要经常更新，YouTube 一改版旧版就抓不到：`brew upgrade yt-dlp`。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "yt-dlp 要常更新，YouTube 一改版舊版就抓不到：`brew upgrade yt-dlp`。"
           }
         }
       }
@@ -667,6 +779,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "先加入頻道。"
+          }
+        }
+      }
+    },
+    "內建 %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Built-in %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内蔵 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "內建 %@"
           }
         }
       }
@@ -1203,6 +1343,34 @@
         }
       }
     },
+    "已更新到 %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updated to %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ に更新しました"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已更新到 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已更新到 %@"
+          }
+        }
+      }
+    },
     "已登入": {
       "localizations": {
         "en": {
@@ -1283,6 +1451,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "已登入：訂閱動態和播放紀錄會同步"
+          }
+        }
+      }
+    },
+    "已經是最新版": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already up to date"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新版です"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已经是最新版"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已經是最新版"
           }
         }
       }
@@ -1595,30 +1791,30 @@
         }
       }
     },
-    "找不到 yt-dlp。請先 `brew install yt-dlp`，或在設定裡指定路徑。": {
+    "找不到 yt-dlp。App 裡內建的那份不見了，請重新下載 Squelch，或在設定裡指定路徑。": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "yt-dlp not found. Run `brew install yt-dlp`, or set its path in Settings."
+            "value": "yt-dlp not found. The copy inside the app is missing; download Squelch again or set a path in Settings."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "yt-dlp が見つかりません。`brew install yt-dlp` を実行するか、設定でパスを指定してください。"
+            "value": "yt-dlp が見つかりません。アプリに内蔵されたものがなくなっています。Squelch をダウンロードし直すか、設定でパスを指定してください。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "找不到 yt-dlp。请先运行 `brew install yt-dlp`，或在设置里指定路径。"
+            "value": "找不到 yt-dlp。App 里内置的那份不见了，请重新下载 Squelch，或在设置里指定路径。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "找不到 yt-dlp。請先 `brew install yt-dlp`，或在設定裡指定路徑。"
+            "value": "找不到 yt-dlp。App 裡內建的那份不見了，請重新下載 Squelch，或在設定裡指定路徑。"
           }
         }
       }
@@ -2183,6 +2379,34 @@
         }
       }
     },
+    "查不到 yt-dlp 的最新版本。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't look up the latest version of yt-dlp."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yt-dlp の最新バージョンを確認できませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查不到 yt-dlp 的最新版本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查不到 yt-dlp 的最新版本。"
+          }
+        }
+      }
+    },
     "標成沒聽過": {
       "localizations": {
         "en": {
@@ -2235,6 +2459,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "標成聽完了"
+          }
+        }
+      }
+    },
+    "檢查更新": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for Updates"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アップデートを確認"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查更新"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢查更新"
           }
         }
       }
@@ -2599,6 +2851,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "準備中"
+          }
+        }
+      }
+    },
+    "無法重新封裝下載的音軌。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't repackage the downloaded audio."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロードした音声を再パッケージできませんでした。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法重新封装下载的音轨。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無法重新封裝下載的音軌。"
           }
         }
       }
@@ -3163,6 +3443,34 @@
         }
       }
     },
+    "自動更新 %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-updated %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動更新 %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动更新 %@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動更新 %@"
+          }
+        }
+      }
+    },
     "自我宣傳": {
       "localizations": {
         "en": {
@@ -3191,30 +3499,30 @@
         }
       }
     },
-    "自訂路徑（留空自動找 Homebrew）": {
+    "自訂路徑（留空用內建的）": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Custom path (leave empty to use Homebrew's)"
+            "value": "Custom path (leave empty to use the built-in one)"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "カスタムパス（空欄なら Homebrew のものを自動で使用）"
+            "value": "カスタムパス（空欄なら内蔵のものを使用）"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自定义路径（留空自动查找 Homebrew）"
+            "value": "自定义路径（留空用内置的）"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "自訂路徑（留空自動找 Homebrew）"
+            "value": "自訂路徑（留空用內建的）"
           }
         }
       }

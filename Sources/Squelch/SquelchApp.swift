@@ -58,6 +58,7 @@ struct SquelchApp: App {
         library.startAutoRefresh()
         library.startLiveWatch()
         Task.detached(priority: .background) { YTDLP.pruneCache() }
+        YTDLPUpdate.checkIfDue()
     }
 
     var body: some Scene {

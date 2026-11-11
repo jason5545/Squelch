@@ -42,5 +42,10 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Squelch
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.entertainment
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
-        # 要用 Process 執行 Homebrew 的 yt-dlp，不開 App Sandbox。
+        # 要用 Process 執行 App 內建（或自動更新下載）的 yt-dlp，不開 App Sandbox。
         ENABLE_APP_SANDBOX: NO
+    postBuildScripts:
+      # yt-dlp 和 deno 包進 Contents/Helpers，不用另外裝 Homebrew。版本寫在 scripts/vendor-tools.sh。
+      - name: Embed yt-dlp and deno
+        script: '"$SRCROOT/scripts/embed-tools.sh"'
+        basedOnDependencyAnalysis: false

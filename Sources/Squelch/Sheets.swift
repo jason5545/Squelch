@@ -116,7 +116,9 @@ struct SettingsView: View {
     @AppStorage("sb.sponsor") private var sponsor = true
     @AppStorage("sb.selfpromo") private var selfpromo = false
     @AppStorage("sb.interaction") private var interaction = false
-    @State private var version: String?
+    @State private var ytdlp: YTDLP.Binary?
+    @State private var updateStatus: String?
+    @State private var checkingUpdate = false
 
     var body: some View {
         Form {
@@ -143,9 +145,15 @@ Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次�
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("yt-dlp") {
-                LabeledContent("使用中", value: YTDLP.binaryPath().map { "\($0)  \(version ?? "")" } ?? String(localized: "找不到"))
-                TextField("自訂路徑（留空自動找 Homebrew）", text: $customPath)
-                Text("yt-dlp 要常更新，YouTube 一改版舊版就抓不到：`brew upgrade yt-dlp`。")
+                LabeledContent("使用中", value: ytdlpDescription)
+                HStack {
+                    Button("檢查更新") { checkUpdate() }
+                        .disabled(checkingUpdate || !customPath.isEmpty)
+                    if checkingUpdate { ProgressView().controlSize(.small) }
+                    if let updateStatus { Text(updateStatus).foregroundStyle(.secondary) }
+                }
+                TextField("自訂路徑（留空用內建的）", text: $customPath)
+                Text("Squelch 內建 yt-dlp 和它需要的 deno，不用另外安裝。YouTube 一改版舊的 yt-dlp 就抓不到，所以每天會到 GitHub 查一次，有新版就自動下載到「~/Library/Application Support/Squelch/yt-dlp」。")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("SponsorBlock") {
@@ -159,6 +167,40 @@ Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次�
         .formStyle(.grouped)
         .frame(width: 480)
         .sheet(isPresented: $showingLogin) { LoginSheet() }
-        .task(id: customPath) { version = await YTDLP.version() }
+        .task(id: customPath) { await loadYTDLP() }
+    }
+
+    private var ytdlpDescription: String {
+        guard let ytdlp else { return String(localized: "找不到") }
+        let version = ytdlp.version ?? ""
+        switch ytdlp.source {
+        case .bundled: return String(localized: "內建 \(version)")
+        case .updated: return String(localized: "自動更新 \(version)")
+        case .homebrew: return "Homebrew \(version)"
+        case .custom: return "\(ytdlp.path)  \(version)"
+        }
+    }
+
+    private func loadYTDLP() async {
+        var binary = YTDLP.binary()
+        if binary != nil, binary?.version == nil { binary?.version = await YTDLP.version() }
+        ytdlp = binary
+    }
+
+    private func checkUpdate() {
+        checkingUpdate = true
+        updateStatus = nil
+        Task {
+            do {
+                switch try await YTDLPUpdate.check() {
+                case .upToDate: updateStatus = String(localized: "已經是最新版")
+                case .updated(let version): updateStatus = String(localized: "已更新到 \(version)")
+                }
+            } catch {
+                updateStatus = error.localizedDescription
+            }
+            await loadYTDLP()
+            checkingUpdate = false
+        }
     }
 }
