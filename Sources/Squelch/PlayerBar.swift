@@ -130,8 +130,8 @@ struct PlayerBar: View {
     private func statusLine(_ ep: Episode) -> String {
         if let error = player.errorMessage { return error }
         if let notice = player.notice { return notice }
-        if player.isLoading { return "\(ep.channelTitle) · 載入中…" }
-        let skips = player.segments.isEmpty ? "" : " · 會跳過 \(player.segments.count) 段"
+        if player.isLoading { return String(localized: "\(ep.channelTitle) · 載入中…") }
+        let skips = player.segments.isEmpty ? "" : String(localized: " · 會跳過 \(player.segments.count) 段")
         return ep.channelTitle + skips
     }
 
@@ -176,14 +176,14 @@ struct VolumeControl: View {
     }
 
     private var label: String {
-        if player.boostPending { return "準備中" }
+        if player.boostPending { return String(localized: "準備中") }
         return "\(Int((player.volume * 100).rounded()))%"
     }
 
     private var help: String {
-        if player.volume <= 1 { return "音量（⌘↑ ⌘↓）。超過 100% 會放大，YouTube 通常比 Spotify 小聲。" }
-        if player.isLive { return "直播沒辦法放大，最大就是 100%" }
-        if player.boostPending { return "正在下載音軌，下載好就會放大" }
-        return player.isLocalPlayback ? "放大中" : "超過 100% 要先下載音軌"
+        if player.volume <= 1 { return String(localized: "音量（⌘↑ ⌘↓）。超過 100% 會放大，YouTube 通常比 Spotify 小聲。") }
+        if player.isLive { return String(localized: "直播沒辦法放大，最大就是 100%") }
+        if player.boostPending { return String(localized: "正在下載音軌，下載好就會放大") }
+        return player.isLocalPlayback ? String(localized: "放大中") : String(localized: "超過 100% 要先下載音軌")
     }
 }

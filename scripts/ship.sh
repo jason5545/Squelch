@@ -1,5 +1,5 @@
 #!/bin/bash
-# 一鍵發版：算出下一個版本 → scripts/release.sh（自我測試、Developer ID 簽章、公證）→ scripts/install.sh → git tag。
+# 一鍵發版：算出下一個版本 → scripts/release.sh（自我測試、Developer ID 簽章、公證）→ scripts/install.sh → git tag → GitHub Release。
 # T3 的「發版並安裝」按鈕跑的就是這支。
 #   scripts/ship.sh            小版號加一（v0.5.1 → 0.5.2）
 #   scripts/ship.sh 0.6.0      指定版本
@@ -35,6 +35,8 @@ scripts/release.sh "$VERSION"
 scripts/install.sh "$VERSION"
 open /Applications/Squelch.app
 
+git push -q origin HEAD
 git tag "v$VERSION"
 git push -q origin "v$VERSION"
-echo "==> 發版完成：Squelch $VERSION 已裝到 /Applications 並打開，tag v$VERSION 已推上 GitHub"
+scripts/publish-release.sh "$VERSION" "${last:-}"
+echo "==> 發版完成：Squelch $VERSION 已裝到 /Applications 並打開，GitHub Release v$VERSION 已發布"

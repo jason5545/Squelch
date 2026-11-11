@@ -20,7 +20,12 @@
 - 觀看記錄：登入時是 YouTube 的觀看記錄（手機上看的也在），沒登入是 Squelch 自己的播放記錄
 - 貼影片網址直接播（直播回放、沒訂閱的頻道）
 - 正在直播的會標「直播中」排在最上面，可以直接聽。「直播中」清單檢查你勾選的頻道（設定或頻道右鍵），每 10 分鐘自動查一次：打開頻道的 `/live` 網頁看播放器資料的 `isLive`，一個頻道一個請求，不用 yt-dlp、不帶帳號（頻道 RSS 在 2026/11 已經 404）。`/live` 只給頻道主要的那一場，同時開好幾場只會抓到一場
+- 介面有正體中文、English、日本語、简体中文，跟著系統語言；其他語言顯示英文
 - 登入 YouTube（選用）：多一個「訂閱動態」，播放紀錄和進度會回報給 YouTube，網頁版和手機可以接著看
+
+## 下載
+
+[GitHub Releases](https://github.com/jason5545/Squelch/releases/latest) 有 Developer ID 簽章、Apple 公證過的版本，解壓縮後拖進「應用程式」就能開。介紹頁：<https://squelch.hiroki.im/>
 
 ## 需求
 
@@ -35,7 +40,7 @@ make run        # 建置後打開
 make selftest   # 不開視窗，實際連 YouTube 跑核心流程
 scripts/release.sh 0.1.0   # Developer ID 簽章＋公證，產出 build/dist/Squelch-0.1.0.zip
 scripts/install.sh 0.1.0   # 裝到 /Applications/Squelch.app
-scripts/ship.sh            # 一鍵：小版號加一、發公證版、安裝、打 git tag（T3 的「發版並安裝」按鈕）
+scripts/ship.sh            # 一鍵：小版號加一、發公證版、安裝、打 git tag、發 GitHub Release（T3 的「發版並安裝」按鈕）
 ```
 
 ## 怎麼播的

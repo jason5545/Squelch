@@ -35,7 +35,7 @@ nonisolated enum LiveProbe {
               let details = obj["videoDetails"] as? [String: Any],
               details["isLive"] as? Bool == true,
               let id = details["videoId"] as? String else { return nil }
-        let title = details["title"] as? String ?? "直播中"
+        let title = details["title"] as? String ?? String(localized: "直播中")
         return Episode(id: id, title: title, channelID: channelID,
                        channelTitle: (details["author"] as? String) ?? channelTitle,
                        duration: nil, published: Date(), isStream: true, isLive: true)

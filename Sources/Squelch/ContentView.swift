@@ -60,7 +60,7 @@ struct ContentView: View {
                         Label("重新整理", systemImage: "arrow.clockwise")
                     }
                 }
-                .help(library.lastRefresh.map { "上次更新：\($0.formatted(date: .omitted, time: .shortened))" } ?? "重新整理")
+                .help(library.lastRefresh.map { String(localized: "上次更新：\($0.formatted(date: .omitted, time: .shortened))") } ?? String(localized: "重新整理"))
                 .disabled(library.refreshing)
             }
         }
@@ -201,7 +201,7 @@ struct EpisodeList: View {
                 }
                 if !ep.channelID.isEmpty, !library.channels.contains(where: { $0.id == ep.channelID }) {
                     Divider()
-                    Button("加入頻道「\(ep.channelTitle.isEmpty ? "這個頻道" : ep.channelTitle)」") {
+                    Button("加入頻道「\(ep.channelTitle.isEmpty ? String(localized: "這個頻道") : ep.channelTitle)」") {
                         Task { try? await library.addChannel(ep.channelID) }
                     }
                 }
@@ -267,7 +267,7 @@ struct EpisodeList: View {
                 ProgressView("正在抓訂閱動態…")
             } else {
                 ContentUnavailableView("訂閱動態是空的", systemImage: "person.2.wave.2",
-                                       description: Text(library.channelErrors[YTDLP.subscriptionsURL] ?? "按右上角的重新整理。"))
+                                       description: Text(library.channelErrors[YTDLP.subscriptionsURL] ?? String(localized: "按右上角的重新整理。")))
             }
         default:
             if library.channels.isEmpty {
@@ -283,34 +283,34 @@ struct EpisodeList: View {
     }
 
     private var liveStatusText: String {
-        let names = library.liveWatchChannels.map(\.title).joined(separator: "、")
-        guard let checked = library.liveChecked else { return "檢查：\(names)，每 10 分鐘自動查一次" }
-        return "檢查：\(names) · \(checked.formatted(date: .omitted, time: .shortened)) 查的，每 10 分鐘自動查一次"
+        let names = library.liveWatchChannels.map(\.title).formatted(.list(type: .and))
+        guard let checked = library.liveChecked else { return String(localized: "檢查：\(names)，每 10 分鐘自動查一次") }
+        return String(localized: "檢查：\(names) · \(checked.formatted(date: .omitted, time: .shortened)) 查的，每 10 分鐘自動查一次")
     }
 
     private var title: String {
         switch item {
-        case .latest: "最新"
-        case .live: "直播中"
-        case .search: library.searchQuery.isEmpty ? "搜尋結果" : "搜尋：\(library.searchQuery)"
-        case .history: "觀看記錄"
-        case .subscriptions: "訂閱動態"
-        case .inProgress: "聽到一半"
-        case .queue: "待播清單"
-        case .channel(let id): library.channels.first { $0.id == id }?.title ?? "頻道"
+        case .latest: String(localized: "最新")
+        case .live: String(localized: "直播中")
+        case .search: library.searchQuery.isEmpty ? String(localized: "搜尋結果") : String(localized: "搜尋：\(library.searchQuery)")
+        case .history: String(localized: "觀看記錄")
+        case .subscriptions: String(localized: "訂閱動態")
+        case .inProgress: String(localized: "聽到一半")
+        case .queue: String(localized: "待播清單")
+        case .channel(let id): library.channels.first { $0.id == id }?.title ?? String(localized: "頻道")
         }
     }
 
     private func subtitle(_ episodes: [Episode]) -> String {
-        if item == .subscriptions, let error = library.channelErrors[YTDLP.subscriptionsURL] { return "更新失敗：\(error)" }
+        if item == .subscriptions, let error = library.channelErrors[YTDLP.subscriptionsURL] { return String(localized: "更新失敗：\(error)") }
         if item == .subscriptions, let fetched = library.subscriptionsFetched {
-            return "\(episodes.count) 部 · \(fetched.formatted(date: .omitted, time: .shortened)) 更新，打開這裡或按重新整理才會再抓"
+            return String(localized: "\(episodes.count) 部 · \(fetched.formatted(date: .omitted, time: .shortened)) 更新，打開這裡或按重新整理才會再抓")
         }
         if item == .live { return liveStatusText }
-        if item == .history { return account.isLoggedIn ? "YouTube 觀看記錄（含手機）" : "Squelch 本機記錄" }
-        if item == .search, library.searching { return "搜尋中…" }
+        if item == .history { return account.isLoggedIn ? String(localized: "YouTube 觀看記錄（含手機）") : String(localized: "Squelch 本機記錄") }
+        if item == .search, library.searching { return String(localized: "搜尋中…") }
         let total = episodes.reduce(0) { $0 + ($1.duration ?? 0) }
-        return episodes.isEmpty ? "" : "\(episodes.count) 部 · 共 \(Format.time(total))"
+        return episodes.isEmpty ? "" : String(localized: "\(episodes.count) 部 · 共 \(Format.time(total))")
     }
 }
 

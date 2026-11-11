@@ -8,9 +8,9 @@ nonisolated struct SkipSegment: Sendable, Hashable {
 
     var label: String {
         switch category {
-        case "sponsor": "贊助片段"
-        case "selfpromo": "自我宣傳"
-        case "interaction": "訂閱提醒"
+        case "sponsor": String(localized: "贊助片段")
+        case "selfpromo": String(localized: "自我宣傳")
+        case "interaction": String(localized: "訂閱提醒")
         default: category
         }
     }
@@ -20,9 +20,9 @@ nonisolated struct SkipSegment: Sendable, Hashable {
 /// 用雜湊前綴查詢：只送影片 ID 的 SHA-256 前 4 碼，伺服器不知道你在聽哪一部。
 nonisolated enum SponsorBlock {
     static let categories: [(key: String, category: String, title: String, defaultOn: Bool)] = [
-        ("sb.sponsor", "sponsor", "跳過贊助片段", true),
-        ("sb.selfpromo", "selfpromo", "跳過自我宣傳（自家產品、周邊）", false),
-        ("sb.interaction", "interaction", "跳過「記得訂閱」提醒", false),
+        ("sb.sponsor", "sponsor", String(localized: "跳過贊助片段"), true),
+        ("sb.selfpromo", "selfpromo", String(localized: "跳過自我宣傳（自家產品、周邊）"), false),
+        ("sb.interaction", "interaction", String(localized: "跳過「記得訂閱」提醒"), false),
     ]
 
     static var enabledCategories: [String] {

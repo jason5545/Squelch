@@ -2,7 +2,9 @@
 name: Squelch
 options:
   bundleIdPrefix: io.github.jason5545
-  developmentLanguage: zh-Hant
+  # 字串的原文是正體中文（Localizable.xcstrings 的 sourceLanguage）；開發地區設成英文，
+  # 系統語言不是中英日時退回英文。
+  developmentLanguage: en
   deploymentTarget:
     macOS: "26.0"
 settings:
@@ -18,6 +20,8 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
 targets:
   Squelch:
     type: application
@@ -26,6 +30,8 @@ targets:
       - path: Sources/Squelch
       - path: Resources/AppIcon.icon
         type: file
+        buildPhase: resources
+      - path: Resources/Localizable.xcstrings
         buildPhase: resources
     settings:
       base:

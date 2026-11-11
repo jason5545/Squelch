@@ -8,9 +8,9 @@ nonisolated enum YTDLPError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notFound: "找不到 yt-dlp。請先 `brew install yt-dlp`，或在設定裡指定路徑。"
+        case .notFound: String(localized: "找不到 yt-dlp。請先 `brew install yt-dlp`，或在設定裡指定路徑。")
         case .failed(let message): message
-        case .badOutput: "yt-dlp 的輸出看不懂。"
+        case .badOutput: String(localized: "yt-dlp 的輸出看不懂。")
         }
     }
 }
@@ -70,7 +70,7 @@ nonisolated enum YTDLP {
                 } else {
                     let text = String(decoding: errBox.data, as: UTF8.self)
                     let lines = text.split(separator: "\n").map(String.init)
-                    let message = lines.last(where: { $0.contains("ERROR") }) ?? lines.last ?? "yt-dlp 結束代碼 \(process.terminationStatus)"
+                    let message = lines.last(where: { $0.contains("ERROR") }) ?? lines.last ?? String(localized: "yt-dlp 結束代碼 \(process.terminationStatus)")
                     continuation.resume(throwing: YTDLPError.failed(message))
                 }
             }

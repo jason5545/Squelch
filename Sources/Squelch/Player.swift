@@ -159,10 +159,10 @@ final class Player {
                 isLoading = true
                 start(local, at: position)
                 if !wasPlaying { pendingPause = true }
-                show("已切換成本機檔，可以放大音量")
+                show(String(localized: "已切換成本機檔，可以放大音量"))
             } catch {
                 guard current?.id == ep.id else { return }
-                show("沒辦法放大音量：\(error.localizedDescription)")
+                show(String(localized: "沒辦法放大音量：\(error.localizedDescription)"))
             }
         }
     }
@@ -220,7 +220,7 @@ final class Player {
     /// 貼上的影片網址：先用 yt-dlp 拿到標題和頻道，再照一般影片播。
     func playURL(_ raw: String) async throws {
         guard let id = ChannelInput.videoID(raw) else {
-            throw YTDLPError.failed("看不懂這個影片網址。")
+            throw YTDLPError.failed(String(localized: "看不懂這個影片網址。"))
         }
         if let known = library.episodes[id] {
             play(known)
@@ -315,7 +315,7 @@ final class Player {
             } else {
                 isLoading = false
                 isPlaying = false
-                errorMessage = message ?? "播放失敗"
+                errorMessage = message ?? String(localized: "播放失敗")
             }
         default:
             break
@@ -425,7 +425,7 @@ final class Player {
             history?.seeked(from: seconds, to: seg.end)
             avPlayer.seek(to: CMTime(seconds: seg.end, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
             position = seg.end
-            show("已跳過\(seg.label) \(Format.time(seg.end - seg.start))")
+            show(String(localized: "已跳過\(seg.label) \(Format.time(seg.end - seg.start))"))
             nowPlaying.update()
         }
         saveProgress(force: false)

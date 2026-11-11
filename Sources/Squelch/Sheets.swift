@@ -121,7 +121,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("YouTube 帳號") {
-                LabeledContent("狀態", value: account.isLoggedIn ? "已登入" : "沒有登入")
+                LabeledContent("狀態", value: account.isLoggedIn ? String(localized: "已登入") : String(localized: "沒有登入"))
                 if account.isLoggedIn {
                     Button("登出") { Task { await account.logout() } }
                 } else {
@@ -143,7 +143,7 @@ Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次�
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("yt-dlp") {
-                LabeledContent("使用中", value: YTDLP.binaryPath().map { "\($0)  \(version ?? "")" } ?? "找不到")
+                LabeledContent("使用中", value: YTDLP.binaryPath().map { "\($0)  \(version ?? "")" } ?? String(localized: "找不到"))
                 TextField("自訂路徑（留空自動找 Homebrew）", text: $customPath)
                 Text("yt-dlp 要常更新，YouTube 一改版舊版就抓不到：`brew upgrade yt-dlp`。")
                     .font(.caption).foregroundStyle(.secondary)

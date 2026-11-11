@@ -304,10 +304,10 @@ final class Library {
 
     func addChannel(_ input: String) async throws {
         guard let id = ChannelInput.normalize(input) else {
-            throw YTDLPError.failed("看不懂這個頻道。可以貼 @handle、頻道網址或 UC 開頭的頻道 ID。")
+            throw YTDLPError.failed(String(localized: "看不懂這個頻道。可以貼 @handle、頻道網址或 UC 開頭的頻道 ID。"))
         }
         if channels.contains(where: { $0.id.caseInsensitiveCompare(id) == .orderedSame }) {
-            throw YTDLPError.failed("這個頻道已經在清單裡了。")
+            throw YTDLPError.failed(String(localized: "這個頻道已經在清單裡了。"))
         }
         let feed = try await YTDLP.feed(channelID: id, includeStreams: false)
         channels.append(Channel(id: id, title: feed.title, avatar: feed.avatar))
