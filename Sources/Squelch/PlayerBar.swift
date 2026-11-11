@@ -1,0 +1,128 @@
+import SwiftUI
+
+struct PlayerBar: View {
+    @Environment(Player.self) private var player
+    @Environment(Library.self) private var library
+    @State private var scrubbing: Double?
+
+    var body: some View {
+        if let ep = player.current {
+            VStack(spacing: 6) {
+                HStack(spacing: 12) {
+                    AsyncImage(url: ep.thumbnail) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Rectangle().fill(.quaternary)
+                    }
+                    .frame(width: 80, height: 45)
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ep.title).lineLimit(1).font(.headline)
+                        Text(statusLine(ep)).lineLimit(1).font(.caption).foregroundStyle(statusColor)
+                    }
+                    Spacer(minLength: 12)
+
+                    controls
+                }
+
+                HStack(spacing: 8) {
+                    Text(Format.time(scrubbing ?? player.position))
+                        .font(.caption.monospacedDigit())
+                        .frame(width: 58, alignment: .trailing)
+                    Slider(value: Binding(
+                        get: { scrubbing ?? player.position },
+                        set: { scrubbing = $0 }),
+                           in: 0...max(player.duration, 1)) { editing in
+                        if !editing, let target = scrubbing {
+                            player.seek(to: target)
+                            scrubbing = nil
+                        }
+                    }
+                    .disabled(player.duration <= 0)
+                    .overlay { segmentMarks }
+                    Text("-" + Format.time(max(0, player.duration - (scrubbing ?? player.position))))
+                        .font(.caption.monospacedDigit())
+                        .frame(width: 58, alignment: .leading)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.bar)
+            .overlay(alignment: .top) { Divider() }
+        }
+    }
+
+    private var controls: some View {
+        HStack(spacing: 14) {
+            Button { player.skip(-15) } label: { Image(systemName: "gobackward.15") }
+                .help("倒退 15 秒（⌘←）")
+            Button { player.toggle() } label: {
+                ZStack {
+                    if player.isLoading || (player.isPlaying && player.isBuffering) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                    }
+                }
+                .frame(width: 28, height: 28)
+            }
+            .font(.title2)
+            .help("播放／暫停（空白鍵、⌘↩）")
+            Button { player.skip(30) } label: { Image(systemName: "goforward.30") }
+                .help("快轉 30 秒（⌘→）")
+            Button { player.playNext() } label: { Image(systemName: "forward.end.fill") }
+                .disabled(library.queue.filter { $0 != player.current?.id }.isEmpty)
+                .help("下一集（待播清單）")
+            Menu {
+                ForEach(Player.rates, id: \.self) { rate in
+                    Button {
+                        player.rate = rate
+                    } label: {
+                        if rate == player.rate {
+                            Label(Format.rate(rate), systemImage: "checkmark")
+                        } else {
+                            Text(Format.rate(rate))
+                        }
+                    }
+                }
+            } label: {
+                Text(Format.rate(player.rate)).monospacedDigit()
+            }
+            .menuStyle(.button)
+            .fixedSize()
+            .help("播放速度（⌘[ ⌘]）")
+        }
+        .buttonStyle(.borderless)
+        .font(.title3)
+    }
+
+    /// 進度條上標出 SponsorBlock 會跳過的片段。
+    private var segmentMarks: some View {
+        GeometryReader { geo in
+            let total = max(player.duration, 1)
+            ForEach(player.segments, id: \.self) { seg in
+                Rectangle()
+                    .fill(.green.opacity(0.6))
+                    .frame(width: max(2, geo.size.width * (seg.end - seg.start) / total), height: 3)
+                    .offset(x: geo.size.width * seg.start / total, y: geo.size.height / 2 + 5)
+                    .help("\(seg.label)：會自動跳過")
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func statusLine(_ ep: Episode) -> String {
+        if let error = player.errorMessage { return error }
+        if let notice = player.notice { return notice }
+        if player.isLoading { return "\(ep.channelTitle) · 載入中…" }
+        let skips = player.segments.isEmpty ? "" : " · 會跳過 \(player.segments.count) 段"
+        return ep.channelTitle + skips
+    }
+
+    private var statusColor: Color {
+        if player.errorMessage != nil { return .red }
+        if player.notice != nil { return .green }
+        return .secondary
+    }
+}

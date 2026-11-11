@@ -1,0 +1,4 @@
+build/
+Squelch.xcodeproj/
+.DS_Store
+xcuserdata/
