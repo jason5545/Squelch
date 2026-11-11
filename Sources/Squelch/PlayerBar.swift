@@ -104,6 +104,8 @@ struct PlayerBar: View {
             .menuStyle(.button)
             .fixedSize()
             .disabled(player.isLive)
+
+            VolumeControl()
             .help("播放速度（⌘[ ⌘]）")
         }
         .buttonStyle(.borderless)
@@ -137,5 +139,51 @@ struct PlayerBar: View {
         if player.errorMessage != nil { return .red }
         if player.notice != nil { return .green }
         return .secondary
+    }
+}
+
+/// Spotify 式音量：喇叭圖示點了靜音，旁邊一條滑桿。滑桿到 200%，超過 100% 的部分是放大。
+struct VolumeControl: View {
+    @Environment(Player.self) private var player
+
+    var body: some View {
+        @Bindable var player = player
+        HStack(spacing: 6) {
+            Button { player.toggleMute() } label: {
+                Image(systemName: icon)
+                    .frame(width: 22)
+            }
+            .help(player.volume == 0 ? "取消靜音" : "靜音")
+            Slider(value: $player.volume, in: 0...2)
+                .frame(width: 110)
+                .controlSize(.small)
+                .tint(player.volume > 1 ? .orange : .accentColor)
+                .help(help)
+            Text(label)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(player.volume > 1 ? .orange : .secondary)
+                .frame(width: 40, alignment: .leading)
+        }
+    }
+
+    private var icon: String {
+        switch player.volume {
+        case 0: "speaker.slash.fill"
+        case ..<0.34: "speaker.wave.1.fill"
+        case ..<0.67: "speaker.wave.2.fill"
+        default: "speaker.wave.3.fill"
+        }
+    }
+
+    private var label: String {
+        if player.boostPending { return "準備中" }
+        return "\(Int((player.volume * 100).rounded()))%"
+    }
+
+    private var help: String {
+        if player.volume <= 1 { return "音量（⌘↑ ⌘↓）。超過 100% 會放大，YouTube 通常比 Spotify 小聲。" }
+        if player.isLive { return "直播沒辦法放大，最大就是 100%" }
+        if player.boostPending { return "正在下載音軌，下載好就會放大" }
+        return player.isLocalPlayback ? "放大中" : "超過 100% 要先下載音軌"
     }
 }

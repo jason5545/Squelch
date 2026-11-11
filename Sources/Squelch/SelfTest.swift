@@ -29,7 +29,7 @@ enum SelfTest {
         check(Format.time(3725) == "1:02:05" && Format.time(65) == "1:05", "format time")
         check(Format.rate(1.5) == "1.5×" && Format.rate(2) == "2×", "format rate")
 
-        let artwork = NowPlaying.makeArtwork(NSImage(size: NSSize(width: 32, height: 18)))
+        nonisolated(unsafe) let artwork = NowPlaying.makeArtwork(NSImage(size: NSSize(width: 32, height: 18)))
         // 要用 async：sync 會直接在呼叫端（主執行緒）跑，測不到。
         let fromBackground = await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
@@ -37,6 +37,15 @@ enum SelfTest {
             }
         }
         check(fromBackground, "Now Playing artwork can be read from a background thread")
+
+        var samples: [Float] = [0.1, 0.4, -0.5, 0.95, -1.0]
+        samples.withUnsafeMutableBufferPointer { Boost.process($0.baseAddress!, count: $0.count, gain: 2) }
+        check(abs(samples[0] - 0.2) < 0.0001 && abs(samples[1] - 0.8) < 0.0001, "boost doubles quiet samples")
+        check(samples.allSatisfy { abs($0) <= 1 } && samples[2] < -0.85 && samples[3] > samples[1],
+              "boost soft-limits loud samples below 1.0: \(samples.map { String(format: "%.3f", $0) })")
+        var unity: [Float] = [0.3, -0.9]
+        unity.withUnsafeMutableBufferPointer { Boost.process($0.baseAddress!, count: $0.count, gain: 1) }
+        check(unity == [0.3, -0.9], "boost at 100% leaves audio untouched")
 
         print("yt-dlp: \(YTDLP.binaryPath() ?? "missing") \(await YTDLP.version() ?? "")")
 
@@ -71,6 +80,7 @@ enum SelfTest {
             } catch {
                 check(false, "resolve: \(error.localizedDescription)")
             }
+            await boostSwitch(ep)
             let segments = await SponsorBlock.segments(videoID: ep.id, categories: ["sponsor", "selfpromo"])
             print("info  SponsorBlock segments: \(segments.map { "\($0.category) \(Format.time($0.start))–\(Format.time($0.end))" })")
         }
@@ -83,8 +93,14 @@ enum SelfTest {
     }
 
     private static func playback(_ stream: ResolvedStream, duration: Double, label: String) async {
-        let item = AVPlayerItem(asset: Player.makeAsset(stream))
+        let asset = Player.makeAsset(stream)
+        let item = AVPlayerItem(asset: asset)
         item.audioTimePitchAlgorithm = .timeDomain
+        let blocksBefore = Boost.processedBlocks.load(ordering: .relaxed)
+        if stream.isLocal, let track = try? await asset.loadTracks(withMediaType: .audio).first {
+            Boost.gain = 2
+            item.audioMix = Boost.makeAudioMix(for: track)
+        }
         let player = AVPlayer(playerItem: item)
         player.volume = 0
 
@@ -120,6 +136,11 @@ enum SelfTest {
         }
         check(t2 - middle > 3, "\(label): seek to \(Format.time(middle)) at 2×: advanced \(String(format: "%.1f", t2 - middle))s in 3s")
         player.pause()
+        if stream.isLocal {
+            let blocks = Boost.processedBlocks.load(ordering: .relaxed) - blocksBefore
+            check(blocks > 50, "\(label): boost tap processed \(blocks) audio blocks")
+            Boost.gain = 1
+        }
     }
 
     private static func accountChecks() async {
@@ -157,6 +178,38 @@ enum SelfTest {
         } else {
             print("info  not logged in, skipping subscriptions feed")
         }
+    }
+
+    /// App 裡的實際流程：播 HLS 時把音量拉過 100%，應該在背景下載、從同一個位置切到本機檔。
+    private static func boostSwitch(_ ep: Episode) async {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-boost-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let savedVolume = UserDefaults.standard.object(forKey: "volume")
+        defer { UserDefaults.standard.set(savedVolume, forKey: "volume") }
+        try? FileManager.default.removeItem(at: YTDLP.cacheDirectory.appendingPathComponent("\(ep.id).m4a"))
+
+        let player = Player(library: Library(directory: dir))
+        player.volume = 1
+        player.avPlayer.isMuted = true
+        player.play(ep)
+        func wait(_ limit: Double, until done: () -> Bool) async {
+            let start = Date()
+            while !done(), Date().timeIntervalSince(start) < limit { try? await Task.sleep(for: .milliseconds(100)) }
+        }
+        await wait(20) { player.isPlaying && player.position > 2 }
+        check(player.isPlaying && !player.isLocalPlayback, "player starts on HLS at 100%")
+        player.seek(to: 300)
+        await wait(5) { player.position > 301 }
+        player.volume = 1.6
+        check(player.boostPending, "volume above 100% starts preparing boost")
+        await wait(30) { player.isLocalPlayback && player.isPlaying && !player.isLoading && player.position > 300 }
+        check(player.isLocalPlayback && player.isPlaying, "switched to local file and kept playing")
+        check(player.position > 300 && player.position < 330,
+              "kept position across the switch: \(Format.time(player.position))")
+        check(abs(Boost.gain - 1.6) < 0.001 && player.avPlayer.volume == 1, "gain 1.6 with player volume capped at 1.0")
+        player.pause()
+        player.volume = 1
+        try? FileManager.default.removeItem(at: YTDLP.cacheDirectory.appendingPathComponent("\(ep.id).m4a"))
     }
 
     /// 24 小時直播的頻道，拿來測直播清單和直播播放。

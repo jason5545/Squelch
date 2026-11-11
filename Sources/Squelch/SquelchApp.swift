@@ -101,6 +101,13 @@ struct PlaybackCommands: Commands {
             Button("下一集") { player.playNext() }
                 .keyboardShortcut(.rightArrow, modifiers: [.command, .shift])
             Divider()
+            Button("大聲一點") { player.changeVolume(by: 0.1) }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+            Button("小聲一點") { player.changeVolume(by: -0.1) }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+            Button(player.volume == 0 ? "取消靜音" : "靜音") { player.toggleMute() }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+            Divider()
             Button("加快") { player.cycleRate(1) }
                 .keyboardShortcut("]", modifiers: .command)
             Button("放慢") { player.cycleRate(-1) }

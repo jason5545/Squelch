@@ -16,6 +16,19 @@ final class Player {
     var notice: String?
     var segments: [SkipSegment] = []
     var isLive = false
+    /// 0～2。超過 1 的部分由 `Boost` 放大，只對本機檔有效。
+    var volume: Float {
+        didSet {
+            UserDefaults.standard.set(volume, forKey: "volume")
+            applyVolume()
+            if volume > 1 { prepareBoost() }
+        }
+    }
+    /// 拉超過 100%、正在下載本機檔準備放大。
+    var boostPending = false
+    var isLocalPlayback = false
+    @ObservationIgnored private var volumeBeforeMute: Float = 1
+    @ObservationIgnored private var boostTask: Task<Void, Never>?
     var rate: Float {
         didSet {
             UserDefaults.standard.set(rate, forKey: "rate")
@@ -36,6 +49,7 @@ final class Player {
     @ObservationIgnored private var controlObservation: NSKeyValueObservation?
     @ObservationIgnored private var resolved: [String: ResolvedStream] = [:]
     @ObservationIgnored private var pendingSeek: Double?
+    @ObservationIgnored private var pendingPause = false
     @ObservationIgnored private var retried = false
     @ObservationIgnored private var skipped: Set<SkipSegment> = []
     @ObservationIgnored private var lastSaved = Date.distantPast
@@ -46,6 +60,8 @@ final class Player {
         self.library = library
         let saved = UserDefaults.standard.float(forKey: "rate")
         rate = saved > 0 ? saved : 1
+        let savedVolume = UserDefaults.standard.object(forKey: "volume") as? Float
+        volume = savedVolume ?? 1
         avPlayer.automaticallyWaitsToMinimizeStalling = true
         timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 2), queue: .main) { [weak self] time in
             let seconds = time.seconds
@@ -67,6 +83,50 @@ final class Player {
             Task { @MainActor in self?.isBuffering = waiting }
         }
         nowPlaying.attach(self)
+        applyVolume()
+    }
+
+    // MARK: 音量
+
+    private func applyVolume() {
+        avPlayer.volume = min(volume, 1)
+        Boost.gain = volume
+    }
+
+    func toggleMute() {
+        if volume > 0 {
+            volumeBeforeMute = volume
+            volume = 0
+        } else {
+            volume = volumeBeforeMute > 0 ? volumeBeforeMute : 1
+        }
+    }
+
+    func changeVolume(by delta: Float) {
+        volume = max(0, min(2, (volume + delta) * 10).rounded() / 10)
+    }
+
+    /// 放大只能用在本機檔。正在播 HLS 時，背景下載音軌，下載好就從同一個位置切過去。
+    private func prepareBoost() {
+        guard let ep = current, !isLocalPlayback, !isLive, boostTask == nil else { return }
+        boostPending = true
+        boostTask = Task {
+            defer { boostTask = nil; boostPending = false }
+            do {
+                let cached = YTDLP.cachedStream(for: ep)
+                let local = if let cached { cached } else { try await YTDLP.download(videoID: ep.id) }
+                guard current?.id == ep.id, !isLocalPlayback else { return }
+                resolved[ep.id] = local
+                let wasPlaying = isPlaying
+                isLoading = true
+                start(local, at: position)
+                if !wasPlaying { pendingPause = true }
+                show("已切換成本機檔，可以放大音量")
+            } catch {
+                guard current?.id == ep.id else { return }
+                show("沒辦法放大音量：\(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: 播放
@@ -75,6 +135,11 @@ final class Player {
         if current != nil { history?.stop(at: position) }
         saveProgress(force: true)
         historyStarted = false
+        boostTask?.cancel()
+        boostTask = nil
+        boostPending = false
+        pendingPause = false
+        isLocalPlayback = false
         let token = UUID()
         loadToken = token
         library.remember(ep)
@@ -132,6 +197,11 @@ final class Player {
 
     private func stream(for id: String, fresh: Bool = false) async throws -> ResolvedStream {
         if !fresh, let cached = resolved[id], cached.isFresh { return cached }
+        if let ep = library.episodes[id] ?? (current?.id == id ? current : nil), !ep.liveNow,
+           let local = YTDLP.cachedStream(for: ep) {
+            resolved[id] = local
+            return local
+        }
         let stream = try await YTDLP.resolve(videoID: id)
         resolved[id] = stream
         return stream
@@ -139,8 +209,16 @@ final class Player {
 
     private func start(_ stream: ResolvedStream, at seconds: Double) {
         teardownItem()
-        let item = AVPlayerItem(asset: Self.makeAsset(stream))
+        let asset = Self.makeAsset(stream)
+        let item = AVPlayerItem(asset: asset)
         item.audioTimePitchAlgorithm = .timeDomain
+        isLocalPlayback = stream.isLocal
+        if stream.isLocal {
+            Task {
+                guard let track = try? await asset.loadTracks(withMediaType: .audio).first else { return }
+                item.audioMix = Boost.makeAudioMix(for: track)
+            }
+        }
         item.preferredForwardBufferDuration = 120
         pendingSeek = seconds > 1 && !isLive ? seconds : nil
         statusObservation = item.observe(\.status) { @Sendable [weak self] item, _ in
@@ -207,8 +285,16 @@ final class Player {
     }
 
     private func beginPlayback() {
+        if pendingPause {
+            // 暫停中切到本機檔：位置到了就停著，不要自己開始播。
+            pendingPause = false
+            isPlaying = false
+            nowPlaying.update()
+            return
+        }
         avPlayer.playImmediately(atRate: isLive ? 1 : rate)
         isPlaying = true
+        if volume > 1 { prepareBoost() }
         if let ep = current, !historyStarted {
             historyStarted = true
             history?.start(videoID: ep.id, at: position)

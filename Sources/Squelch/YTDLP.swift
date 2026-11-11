@@ -168,7 +168,17 @@ nonisolated enum YTDLP {
         }
     }
 
+    /// YouTube 偶爾對下載回 403，yt-dlp 不會自己重試（2026/11/11 自我測試遇過，重跑就好），所以重試一次。
     static func download(videoID: String) async throws -> ResolvedStream {
+        do {
+            return try await downloadOnce(videoID: videoID)
+        } catch YTDLPError.failed(let message) where message.contains("403") {
+            try await Task.sleep(for: .seconds(2))
+            return try await downloadOnce(videoID: videoID)
+        }
+    }
+
+    private static func downloadOnce(videoID: String) async throws -> ResolvedStream {
         let dir = cacheDirectory
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let data = try await run([
@@ -185,6 +195,15 @@ nonisolated enum YTDLP {
         stream.isLocal = true
         stream.expires = .distantFuture
         return stream
+    }
+
+    /// 快取裡已經有的音軌（之前下載過）。有的話直接播本機檔：開播更快，也能放大音量。
+    static func cachedStream(for ep: Episode) -> ResolvedStream? {
+        let file = cacheDirectory.appendingPathComponent("\(ep.id).m4a")
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: file.path)
+        return ResolvedStream(url: file, isLocal: true, headers: [:], duration: ep.duration, title: ep.title,
+                              channelTitle: ep.channelTitle, channelID: ep.channelID, expires: .distantFuture)
     }
 
     /// 刪掉一週沒碰的快取檔。
