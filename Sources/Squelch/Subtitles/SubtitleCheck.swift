@@ -73,15 +73,29 @@ enum SubtitleCheck {
                 print("FAIL 沒有任何字幕")
                 return false
             }
-            let picked = Array(cues.filter { $0.translation == nil }.prefix(6))
+            let size = arguments.firstIndex(of: "--batch").flatMap { $0 + 1 < arguments.count ? Int(arguments[$0 + 1]) : nil } ?? 6
+            let effort = arguments.firstIndex(of: "--effort").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
+            let picked = Array(cues.filter { $0.translation == nil }.prefix(size))
             let batch = CodexTranslator.Batch(
-                target: target, title: stream.title, channel: stream.channelTitle,
+                effort: effort, target: target, title: stream.title, channel: stream.channelTitle,
                 items: picked.enumerated().map { CodexTranslator.Item(id: $0.offset + 1, text: $0.element.text) },
                 before: [], after: cues.dropFirst(picked.count).prefix(2).map(\.text))
             clock = Date()
             let translator = CodexTranslator()
             let result = try await translator.translate(batch)
             print("翻譯 \(picked.count) 句（\(CodexTranslator.model) \(CodexTranslator.effort) \(CodexTranslator.serviceTier)）：\(String(format: "%.1f", -clock.timeIntervalSinceNow)) 秒")
+            let t1 = await translator.lastTimings
+            print(String(format: "  第一批（冷）：啟動 %.1f 秒、thread/start %.1f 秒、翻譯 %.1f 秒", t1.start, t1.thread, t1.turn))
+            // 同一個 app-server 再翻一批，看熱的時候差多少。
+            let second = Array(cues.filter { $0.translation == nil }.dropFirst(picked.count).prefix(picked.count))
+            if !second.isEmpty {
+                _ = try? await translator.translate(CodexTranslator.Batch(
+                    effort: effort, target: target, title: stream.title, channel: stream.channelTitle,
+                    items: second.enumerated().map { CodexTranslator.Item(id: $0.offset + 1, text: $0.element.text) },
+                    before: [], after: []))
+                let t2 = await translator.lastTimings
+                print(String(format: "  第二批（熱）：啟動 %.1f 秒、thread/start %.1f 秒、翻譯 %.1f 秒", t2.start, t2.thread, t2.turn))
+            }
             let info = await translator.lastThread
             print("Codex 回報：model=\(info.model ?? "?") serviceTier=\(info.tier ?? "?") reasoningEffort=\(info.effort ?? "?")")
             for (n, cue) in picked.enumerated() {
@@ -169,6 +183,11 @@ enum SubtitleFlowCheck {
         let ahead = subtitles.cues.filter { $0.translation != nil && $0.start > position }.map(\.start).max().map { $0 - position } ?? 0
         let translated = subtitles.cues.filter { $0.translation != nil }.count
         check(ahead > 20, "translation runs ahead of playback: \(String(format: "%.0f", ahead))s ahead at \(Format.time(position)), \(translated)/\(subtitles.cues.count) lines")
+        // 起步用 low 翻的草稿：還沒播到的要被 xhigh 重翻掉。
+        let drafts = subtitles.cues.filter { $0.draft == true }
+        let draftsAhead = drafts.filter { $0.start > player.position + 25 }
+        print("info  drafts (fast start, low effort): \(drafts.count), still ahead of playback: \(draftsAhead.count)")
+        check(!drafts.isEmpty && draftsAhead.isEmpty, "fast start: \(drafts.count) lines translated quickly, none left as drafts ahead of playback")
 
         // 跳到 10 分鐘：多久有中文。
         let target = min(600, max(0, (stream.duration ?? 700) - 90))

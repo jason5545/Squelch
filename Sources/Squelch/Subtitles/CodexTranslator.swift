@@ -17,6 +17,8 @@ actor CodexTranslator {
     }
 
     struct Batch: Sendable {
+        /// 推理等級，nil 是預設的 xhigh。
+        var effort: String? = nil
         var target: SubtitleTarget
         var title: String
         var channel: String
@@ -55,8 +57,14 @@ actor CodexTranslator {
 
     // MARK: 翻譯
 
+    /// 最近一次翻譯各段花的時間（秒）：啟動、thread/start、等回覆。檢查模式印出來看冷啟動慢在哪。
+    private(set) var lastTimings: (start: Double, thread: Double, turn: Double) = (0, 0, 0)
+
     func translate(_ batch: Batch) async throws -> [Int: String] {
+        var clock = Date()
         try await ensureStarted()
+        let startTime = -clock.timeIntervalSinceNow
+        clock = Date()
         let cwd = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-codex", isDirectory: true)
         try? FileManager.default.createDirectory(at: cwd, withIntermediateDirectories: true)
 
@@ -71,6 +79,8 @@ actor CodexTranslator {
             "serviceTier": Self.serviceTier,
         ])
         lastThread = (thread["model"] as? String, thread["serviceTier"] as? String, thread["reasoningEffort"] as? String)
+        let threadTime = -clock.timeIntervalSinceNow
+        clock = Date()
         guard let threadID = (thread["thread"] as? [String: Any])?["id"] as? String else {
             throw SubtitleError.codex("沒有 thread id")
         }
@@ -82,13 +92,14 @@ actor CodexTranslator {
             "outputSchema": Self.schema,
             "summary": "none",
             "model": Self.model,
-            "effort": Self.effort,
+            "effort": batch.effort ?? Self.effort,
             "serviceTier": Self.serviceTier,
         ])
         guard let turnID = (turn["turn"] as? [String: Any])?["id"] as? String else {
             throw SubtitleError.codex("沒有 turn id")
         }
         let text = try await waitForTurn(turnID)
+        lastTimings = (startTime, threadTime, -clock.timeIntervalSinceNow)
         return try Self.parse(text, expected: batch.items.map(\.id))
     }
 

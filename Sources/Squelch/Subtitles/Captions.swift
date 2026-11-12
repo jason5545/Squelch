@@ -10,6 +10,8 @@ nonisolated struct Cue: Codable, Hashable, Sendable {
     var translation: String?
     /// 語音辨識偵測到的語言（YouTube 字幕不填）。
     var language: String?
+    /// 起步時用低推理等級先翻的，之後有空檔會用 xhigh 重翻。
+    var draft: Bool?
 }
 
 /// 字幕要翻成哪種語言。預設跟著介面語言。

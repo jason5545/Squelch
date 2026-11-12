@@ -85,6 +85,8 @@ final class Subtitles {
     /// 正在翻的句子（用開始時間當鍵）。
     @ObservationIgnored private var inFlight: Set<Double> = []
     @ObservationIgnored private var batches = 0
+    /// 正在跑的快速通道批次（一次只開一批）。
+    @ObservationIgnored private var urgentBatches = 0
     @ObservationIgnored private var retryAfter = Date.distantPast
     // 閒置釋放（見最上面的說明）。
     /// 檢查模式會縮短，正式使用不改。
@@ -253,42 +255,73 @@ final class Subtitles {
         }
     }
 
+    /// 兩條通道：播放位置往後 20 秒內還沒翻的句子（剛打開、剛跳轉、直播）走快速通道，用 low 一次最多 6 句，
+    /// 約 5～6 秒出譯文（xhigh 要 9～11 秒，2026/11/12 實測），譯文標成草稿；20 秒以後的走 xhigh。
+    /// 草稿等 xhigh 翻到前面、有空檔時，還沒播到的再用 xhigh 重翻蓋掉。直播的新句子都在 20 秒內，所以直播一律走快速通道。
+    static let fastEffort = "low"
+    static let urgentWindow = 20.0
+
     private func scheduleBatch() {
-        guard needsTranslation, batches < 2, Date() >= retryAfter, let ep = episode else { return }
+        // 平常最多兩批；起步那批（快速通道）可以第三批插隊，跳轉時不用等前面的 xhigh 回來。
+        guard needsTranslation, batches < 3, Date() >= retryAfter, let ep = episode else { return }
         let position = player?.current?.id == ep.id ? player?.subtitleClock ?? 0 : 0
         let pending = cues.indices.filter { i in
             cues[i].translation == nil && !inFlight.contains(cues[i].start)
                 && cues[i].end >= position - 5 && cues[i].start <= position + 300
         }
-        guard let first = pending.first else { return }
-        // 一開始先翻一小批，字幕早點出來；已經翻到前面了就一次翻多一點。
-        let readyAhead = cues.last { $0.translation != nil && $0.start >= position }.map { $0.start - position } ?? 0
-        let size = readyAhead < 20 ? 6 : 16
-        let picked = Array(pending.prefix(size))
-        // 正在辨識、後面還沒出來的句子先等一下，湊不到一批又離播放位置還遠就先不送。
-        if status == .speech, picked.count < size, cues[first].start > position + 30 { return }
+        var picked: [Int]
+        var effort: String?
+        let urgent = pending.filter { cues[$0].start < position + Self.urgentWindow }
+        let later = pending.filter { cues[$0].start >= position + Self.urgentWindow }
+        if !urgent.isEmpty, urgentBatches == 0 {
+            picked = Array(urgent.prefix(6))
+            effort = Self.fastEffort
+        } else if let first = later.first {
+            guard batches < 2 else { return }
+            // 已經翻到前面了就一次翻多一點。
+            let readyAhead = cues.last { $0.translation != nil && $0.start >= position }.map { $0.start - position } ?? 0
+            let size = readyAhead < 40 ? 6 : 16
+            picked = Array(later.prefix(size))
+            // 正在辨識、後面還沒出來的句子先等一下，湊不到一批又離播放位置還遠就先不送。
+            if status == .speech, picked.count < size, cues[first].start > position + 30 { return }
+        } else {
+            guard batches < 2 else { return }
+            // 沒有沒翻的：還沒播到的草稿用 xhigh 重翻。
+            let drafts = cues.indices.filter { i in
+                cues[i].draft == true && !inFlight.contains(cues[i].start)
+                    && cues[i].start > position + 20 && cues[i].start <= position + 300
+            }
+            guard !drafts.isEmpty else { return }
+            picked = Array(drafts.prefix(16))
+        }
+        guard let firstPicked = picked.first, let lastIndex = picked.last else { return }
         let items = picked.enumerated().map { CodexTranslator.Item(id: $0.offset + 1, text: cues[$0.element].text) }
         let starts = picked.map { cues[$0].start }
-        let before = cues[max(0, first - 4)..<first].map { ($0.text, $0.translation) }
-        let lastIndex = picked.last!
+        let before = cues[max(0, firstPicked - 4)..<firstPicked].map { ($0.text, $0.translation) }
         let after = cues[(lastIndex + 1)..<min(cues.count, lastIndex + 3)].map(\.text)
-        let batch = CodexTranslator.Batch(target: target, title: ep.title, channel: ep.channelTitle, items: items,
+        let batch = CodexTranslator.Batch(effort: effort, target: target, title: ep.title, channel: ep.channelTitle, items: items,
                                           before: Array(before), after: Array(after))
+        let draft = effort != nil
         starts.forEach { inFlight.insert($0) }
         batches += 1
+        if draft { urgentBatches += 1 }
         codexRunning = true
         lastTranslation = Date()
         Task {
             defer {
                 lastTranslation = Date()
                 batches -= 1
+                if draft { urgentBatches -= 1 }
                 starts.forEach { inFlight.remove($0) }
             }
             do {
                 let result = try await translator.translate(batch)
                 guard episode?.id == ep.id, target == batch.target else { return }
                 for (n, start) in starts.enumerated() {
-                    if let i = cues.firstIndex(where: { $0.start == start }) { cues[i].translation = result[n + 1] }
+                    if let i = cues.firstIndex(where: { $0.start == start }) {
+                        cues[i].translation = result[n + 1]
+                        cues[i].draft = draft ? true : nil
+                    }
                 }
                 translationError = nil
                 save()
