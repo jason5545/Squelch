@@ -2914,30 +2914,30 @@
         }
       }
     },
-    "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。直播沒有字幕。翻好的存在快取，重聽不用再翻。": {
+    "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。翻好的存在快取，重聽不用再翻。": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uses YouTube's subtitles when there are any (uploaded ones first, then auto-generated) and translates them into Traditional Chinese (Taiwan) with the Codex on this Mac, signed in with your own Codex account. Chinese videos aren't translated, only converted to Traditional characters. Live streams have no subtitles. Translations are cached, so listening again doesn't translate again."
+            "value": "Uses YouTube's subtitles when there are any (uploaded ones first, then auto-generated) and translates them into Traditional Chinese (Taiwan) with the Codex on this Mac, signed in with your own Codex account. Chinese videos aren't translated, only converted to Traditional characters. Translations are cached, so listening again doesn't translate again."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "YouTube の字幕があればそれを使い（アップロードされたものを優先、なければ自動字幕）、この Mac の Codex で繁体字中国語（台湾）に翻訳します。Codex はあなた自身のアカウントでログインしたものを使います。中国語の動画は翻訳せず、繁体字に変換するだけです。ライブ配信には字幕がありません。翻訳はキャッシュされるので、聴き直すときは再翻訳しません。"
+            "value": "YouTube の字幕があればそれを使い（アップロードされたものを優先、なければ自動字幕）、この Mac の Codex で繁体字中国語（台湾）に翻訳します。Codex はあなた自身のアカウントでログインしたものを使います。中国語の動画は翻訳せず、繁体字に変換するだけです。翻訳はキャッシュされるので、聴き直すときは再翻訳しません。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 YouTube 字幕就用（人工上传的优先，其次是自动字幕），交给本机的 Codex 翻成繁体中文（台湾），用的是你自己的 Codex 登录。原文是中文的不翻，只转成繁体字。直播没有字幕。翻好的存在缓存，重听不用再翻。"
+            "value": "有 YouTube 字幕就用（人工上传的优先，其次是自动字幕），交给本机的 Codex 翻成繁体中文（台湾），用的是你自己的 Codex 登录。原文是中文的不翻，只转成繁体字。翻好的存在缓存，重听不用再翻。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。直播沒有字幕。翻好的存在快取，重聽不用再翻。"
+            "value": "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。翻好的存在快取，重聽不用再翻。"
           }
         }
       }
@@ -3894,30 +3894,86 @@
         }
       }
     },
-    "用 Qwen3-ASR 1.7B 在這台 Mac 上辨識，不會上傳聲音。第一次打開要下載約 2.5 GB 的模型（Hugging Face）。": {
+    "用 Qwen3-ASR 1.7B 在這台 Mac 上辨識，不會上傳聲音。第一次打開要下載約 2.5 GB 的模型（Hugging Face）。直播一定沒有字幕：模型下載過就自動聽寫，這個開關關著也一樣。": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Runs Qwen3-ASR 1.7B on this Mac; audio is never uploaded. The first time you turn it on, a 2.5 GB model is downloaded from Hugging Face."
+            "value": "Runs Qwen3-ASR 1.7B on this Mac; audio is never uploaded. The first time you turn it on, a 2.5 GB model is downloaded from Hugging Face. Live streams never have subtitles: once the model is downloaded they're transcribed automatically, even with this switch off."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "Qwen3-ASR 1.7B をこの Mac 上で動かします。音声はアップロードしません。初めてオンにすると約 2.5 GB のモデルを Hugging Face からダウンロードします。"
+            "value": "Qwen3-ASR 1.7B をこの Mac 上で動かします。音声はアップロードしません。初めてオンにすると約 2.5 GB のモデルを Hugging Face からダウンロードします。ライブ配信には字幕がないため、モデルをダウンロード済みならこのスイッチがオフでも自動で文字起こしします。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用 Qwen3-ASR 1.7B 在这台 Mac 上识别，不会上传声音。第一次打开要下载约 2.5 GB 的模型（Hugging Face）。"
+            "value": "用 Qwen3-ASR 1.7B 在这台 Mac 上识别，不会上传声音。第一次打开要下载约 2.5 GB 的模型（Hugging Face）。直播一定没有字幕：模型下载过就自动听写，这个开关关着也一样。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "用 Qwen3-ASR 1.7B 在這台 Mac 上辨識，不會上傳聲音。第一次打開要下載約 2.5 GB 的模型（Hugging Face）。"
+            "value": "用 Qwen3-ASR 1.7B 在這台 Mac 上辨識，不會上傳聲音。第一次打開要下載約 2.5 GB 的模型（Hugging Face）。直播一定沒有字幕：模型下載過就自動聽寫，這個開關關著也一樣。"
+          }
+        }
+      }
+    },
+    "用本機語音辨識": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe on this Mac"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Mac で文字起こし"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用本机语音识别"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用本機語音辨識"
+          }
+        }
+      }
+    },
+    "用本機語音辨識（下載 2.5 GB）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe on this Mac (2.5 GB download)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この Mac で文字起こし（2.5 GB ダウンロード）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用本机语音识别（下载 2.5 GB）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用本機語音辨識（下載 2.5 GB）"
           }
         }
       }
@@ -4198,34 +4254,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "直播回放、沒訂閱的頻道都可以，只播聲音。"
-          }
-        }
-      }
-    },
-    "直播沒有字幕": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No subtitles for live streams"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ライブ配信には字幕がありません"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "直播没有字幕"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "直播沒有字幕"
           }
         }
       }
@@ -5262,6 +5290,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "這個頻道已經在清單裡了。"
+          }
+        }
+      }
+    },
+    "這場直播沒有字幕": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This live stream has no subtitles"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このライブ配信には字幕がありません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这场直播没有字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這場直播沒有字幕"
           }
         }
       }

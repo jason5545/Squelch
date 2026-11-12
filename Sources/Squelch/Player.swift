@@ -80,6 +80,11 @@ final class Player {
     /// 直播在回放窗口裡的位置（AVPlayer 的時間），和可以拉的範圍。
     var liveTime: Double = 0
     var liveWindow: ClosedRange<Double>?
+    /// 直播正在播的那一刻的實際時間（UNIX 秒）。YouTube 直播的 HLS 有 `EXT-X-PROGRAM-DATE-TIME`，
+    /// AVPlayer 的 `currentDate()` 就是它；字幕的語音辨識用同一個時間戳，兩邊才對得上。
+    var liveDate: Double = 0
+    /// 字幕對時用的時間：一般影片是播放位置，直播是 `liveDate`。
+    var subtitleClock: Double { isLive ? liveDate : position }
     /// 窗口至少 2 分鐘才算支援回放；沒有的直播只能聽最新的。
     var canSeekLive: Bool { isLive && (liveWindow.map { $0.upperBound - $0.lowerBound } ?? 0) >= 120 }
     /// 落後最新多少秒。剛開播約 0（AVPlayer 會停在窗口尾端附近）。
@@ -232,6 +237,7 @@ final class Player {
         position = isLive ? 0 : library.resumePosition(for: ep)
         liveTime = 0
         liveWindow = nil
+        liveDate = 0
         duration = isLive ? 0 : ep.duration ?? 0
         teardownItem()
         nowPlaying.update()
@@ -593,6 +599,7 @@ final class Player {
             liveLastTick = seconds
             liveTime = seconds
             liveWindow = currentLiveWindow()
+            liveDate = avPlayer.currentItem?.currentDate()?.timeIntervalSince1970 ?? 0
             history?.tick(at: seconds, playing: isPlaying)
             return
         }

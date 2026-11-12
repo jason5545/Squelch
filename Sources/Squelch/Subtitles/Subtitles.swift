@@ -1,7 +1,8 @@
 import Foundation
 import Observation
 
-/// 字幕：有 YouTube 字幕（人工或自動）就拿來翻，沒有才用本機語音辨識（另外要打開）。預設全部關著。
+/// 字幕：有 YouTube 字幕（人工或自動）就拿來翻，沒有才用本機語音辨識。預設全部關著。
+/// 直播沒有字幕可抓：模型已經在這台 Mac 上就直接聽寫，不然要使用者按一下才下載模型。直播的時間軸是實際時間（UNIX 秒）。
 ///
 /// 翻譯和辨識都跑在播放位置前面：翻譯先翻接下來 5 分鐘內的句子，一次最多兩批；辨識最多做到播放位置後 3 分鐘。
 /// 結果存在 `~/Library/Caches/Squelch/subtitles/<影片 ID>.json`，重聽不用再翻。
@@ -51,6 +52,8 @@ final class Subtitles {
     private(set) var translationError: String?
     /// 這一集的字幕要翻（原文不是中文）。
     private(set) var needsTranslation = false
+    /// 沒有字幕、本機語音辨識也沒開：字幕列提供一顆按鈕打開它。
+    private(set) var offerSpeech = false
     let model = SpeechModel()
 
     static let enabledKey = "subtitles"
@@ -149,11 +152,8 @@ final class Subtitles {
 
     private func load() {
         guard let ep = episode, let stream else { return }
-        if stream.isLive || ep.liveNow {
-            status = .unavailable(String(localized: "直播沒有字幕"))
-            return
-        }
         status = .loading
+        offerSpeech = false
         loadTask = Task {
             if let cached = Self.readCache(ep.id) {
                 cues = cached.cues
@@ -190,9 +190,18 @@ final class Subtitles {
         }
     }
 
+    /// 沒有字幕。直播只要模型已經在這台 Mac 上就直接聽寫；其他情況要使用者打開「本機語音辨識」（可能要下載模型）。
+    /// 這一集可以用本機語音辨識：開關打開，或是直播而且模型已經在這台 Mac 上（不用下載）。
+    private var speechAllowed: Bool {
+        let live = stream?.isLive == true || episode?.liveNow == true
+        return speechFallback || (live && model.state == .ready)
+    }
+
     private func noCaptions() {
-        guard speechFallback else {
-            status = .unavailable(String(localized: "這部沒有字幕"))
+        let live = stream?.isLive == true || episode?.liveNow == true
+        guard speechAllowed else {
+            status = .unavailable(live ? String(localized: "這場直播沒有字幕") : String(localized: "這部沒有字幕"))
+            offerSpeech = true
             return
         }
         status = .speech
@@ -215,7 +224,7 @@ final class Subtitles {
 
     private func scheduleBatch() {
         guard needsTranslation, batches < 2, Date() >= retryAfter, let ep = episode else { return }
-        let position = player?.current?.id == ep.id ? player?.position ?? 0 : 0
+        let position = player?.current?.id == ep.id ? player?.subtitleClock ?? 0 : 0
         let pending = cues.indices.filter { i in
             cues[i].translation == nil && !inFlight.contains(cues[i].start)
                 && cues[i].end >= position - 5 && cues[i].start <= position + 300
@@ -266,7 +275,7 @@ final class Subtitles {
     // MARK: 語音辨識
 
     private func startSpeech() {
-        guard speechFallback, speechTask == nil, let ep = episode, let stream else { return }
+        guard speechAllowed, speechTask == nil, let ep = episode, let stream else { return }
         speechTask = Task {
             // 模型還沒好就先準備（打開設定時已經開始了），好了才接著做。
             model.prepare()
@@ -281,10 +290,16 @@ final class Subtitles {
                 status = .unavailable(error.localizedDescription)
                 return
             }
-            let end = (stream.duration ?? .infinity) - 1
+            let live = stream.isLive
+            let end = live ? .infinity : (stream.duration ?? .infinity) - 1
+            // 直播要等 AVPlayer 開始播、有實際時間了才知道從哪裡開始。
+            while live, (player?.subtitleClock ?? 0) < 1e9 {
+                try? await Task.sleep(for: .milliseconds(500))
+                if Task.isCancelled { return }
+            }
             while !Task.isCancelled, episode?.id == ep.id {
                 // 從播放位置開始；播放位置在做過的範圍裡，就從那段的結尾接著做。
-                let position = player?.position ?? 0
+                let position = player?.subtitleClock ?? 0
                 var from = position
                 if let range = heard.first(where: { position >= $0.lowerBound - 2 && position <= $0.upperBound + 5 }) {
                     from = range.upperBound
@@ -300,7 +315,7 @@ final class Subtitles {
                 let run = Task {
                     defer { state.done = true }
                     try await speech.run(stream, from: from, horizon: { @MainActor in
-                        (player?.position ?? 0) + 180
+                        (player?.subtitleClock ?? 0) + 180
                     }, emit: { @MainActor [weak self] cue, reached in
                         self?.speechEmitted(cue, reached: reached, episodeID: ep.id, state: state)
                     })
@@ -312,7 +327,7 @@ final class Subtitles {
                         run.cancel()
                         break
                     }
-                    let now = player?.position ?? 0
+                    let now = player?.subtitleClock ?? 0
                     if let range = heard.first(where: { $0.contains(runStart) }),
                        now < range.lowerBound - 2 || now > range.upperBound + 30 {
                         run.cancel()
@@ -363,6 +378,11 @@ final class Subtitles {
         if let cue {
             let index = cues.firstIndex { $0.start > cue.start } ?? cues.count
             cues.insert(cue, at: index)
+        }
+        // 直播只留最近 2 小時，24 小時的直播也不會越存越大。
+        if stream?.isLive == true, let clock = player?.subtitleClock, clock > 1e9, let first = cues.first, first.start < clock - 7200 {
+            cues.removeAll { $0.start < clock - 7200 }
+            heard = heard.filter { $0.upperBound >= clock - 7200 }
         }
         save()
     }

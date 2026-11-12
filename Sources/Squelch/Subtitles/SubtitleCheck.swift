@@ -128,7 +128,7 @@ enum SubtitleFlowCheck {
             return false
         }
         let ep = Episode(id: id, title: stream.title, channelID: stream.channelID ?? "", channelTitle: stream.channelTitle,
-                         duration: stream.duration, published: Date())
+                         duration: stream.duration, published: Date(), isLive: stream.isLive)
         let savedRate = UserDefaults.standard.object(forKey: "rate")
         let savedVolume = UserDefaults.standard.object(forKey: "volume")
         defer {
@@ -149,6 +149,7 @@ enum SubtitleFlowCheck {
 
         let started = Date()
         player.play(ep)
+        if stream.isLive { return await live(player, subtitles, ep, started, cacheFile) }
         // 第一句有中文的字幕出現在畫面上（播放位置那句）。
         var firstShown: Double?
         while Date().timeIntervalSince(started) < 90 {
@@ -192,6 +193,51 @@ enum SubtitleFlowCheck {
         again.attach(ep, stream)
         try? await Task.sleep(for: .milliseconds(500))
         check(again.cues.filter { $0.translation != nil }.count == savedTranslated, "reattach reads the cache")
+        print(ok ? "ALL PASS" : "FAILED")
+        return ok
+    }
+
+    /// 直播：沒有字幕，靠本機語音辨識。量字幕出來的速度，和字幕比播放位置早或晚多少。
+    private static func live(_ player: Player, _ subtitles: Subtitles, _ ep: Episode, _ started: Date, _ cacheFile: URL) async -> Bool {
+        var ok = true
+        func check(_ pass: Bool, _ label: String) {
+            print((pass ? "PASS  " : "FAIL  ") + label)
+            if !pass { ok = false }
+        }
+        while Date().timeIntervalSince(started) < 30, player.liveDate < 1e9 {
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        let behind = Date().timeIntervalSince1970 - player.liveDate
+        check(player.liveDate > 1e9, "live: AVPlayer reports the program date (playing \(String(format: "%.0f", behind))s behind real time)")
+        var firstSource: Double?, firstShown: Double?
+        while Date().timeIntervalSince(started) < 120, firstShown == nil {
+            try? await Task.sleep(for: .milliseconds(250))
+            if firstSource == nil, subtitles.cue(at: player.subtitleClock) != nil { firstSource = Date().timeIntervalSince(started) }
+            if let cue = subtitles.cue(at: player.subtitleClock), cue.translation != nil {
+                firstShown = Date().timeIntervalSince(started)
+                print("info  \(cue.text)\n      → \(cue.translation ?? "")")
+            }
+        }
+        check(subtitles.status == .speech, "live: no captions, speech recognition started (status \(subtitles.status))")
+        check(firstShown != nil, "live: first line on screen after \(firstSource.map { String(format: "%.1f", $0) } ?? "–")s, translated after \(firstShown.map { String(format: "%.1f", $0) } ?? "–")s (error \(subtitles.translationError ?? "none"))")
+        // 再聽 60 秒：每秒看一次播放位置那句有沒有字幕、有沒有翻好。
+        var seconds = 0, withLine = 0, translated = 0
+        while seconds < 60 {
+            try? await Task.sleep(for: .seconds(1))
+            seconds += 1
+            if let cue = subtitles.cue(at: player.subtitleClock) {
+                withLine += 1
+                if cue.translation != nil { translated += 1 }
+            }
+        }
+        let clock = player.subtitleClock
+        let newest = subtitles.cues.last.map { $0.end - clock } ?? -999
+        print("info  60s: line on screen \(withLine)s, translated \(translated)s; newest cue ends \(String(format: "%+.0f", newest))s from playback; \(subtitles.cues.count) cues")
+        check(translated >= 20, "live: translated lines shown for \(translated) of 60 seconds")
+        player.pause()
+        try? await Task.sleep(for: .seconds(3))
+        check(FileManager.default.fileExists(atPath: cacheFile.path), "live: cache saved")
+        try? FileManager.default.removeItem(at: cacheFile)
         print(ok ? "ALL PASS" : "FAILED")
         return ok
     }

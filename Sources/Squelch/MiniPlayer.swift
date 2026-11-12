@@ -170,7 +170,7 @@ private struct MiniSubtitle: View {
     @Environment(Subtitles.self) private var subtitles
 
     var body: some View {
-        let cue = subtitles.cue(at: player.position)
+        let cue = subtitles.cue(at: player.subtitleClock)
         VStack(spacing: 2) {
             if let cue {
                 Text(cue.translation ?? cue.text)
@@ -183,8 +183,9 @@ private struct MiniSubtitle: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-            } else if let note = SubtitleStrip.note(subtitles, position: player.position) {
+            } else if let note = SubtitleStrip.note(subtitles) {
                 Text(note).font(.caption).foregroundStyle(.secondary)
+                if subtitles.offerSpeech { SpeechOfferButton().font(.caption.weight(.semibold)) }
             }
         }
         .multilineTextAlignment(.center)

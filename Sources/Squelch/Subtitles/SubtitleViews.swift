@@ -7,7 +7,7 @@ struct SubtitleStrip: View {
 
     var body: some View {
         if subtitles.enabled, player.current != nil {
-            let cue = subtitles.cue(at: player.position)
+            let cue = subtitles.cue(at: player.subtitleClock)
             VStack(spacing: 3) {
                 if let cue {
                     Text(cue.translation ?? cue.text)
@@ -18,10 +18,13 @@ struct SubtitleStrip: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
-                } else if let note = Self.note(subtitles, position: player.position) {
-                    Text(note)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                } else if let note = Self.note(subtitles) {
+                    HStack(spacing: 10) {
+                        Text(note)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        if subtitles.offerSpeech { SpeechOfferButton() }
+                    }
                 }
             }
             .multilineTextAlignment(.center)
@@ -40,7 +43,7 @@ struct SubtitleStrip: View {
     }
 
     /// 沒有字幕可以顯示時，說明為什麼。迷你視窗也用。
-    static func note(_ subtitles: Subtitles, position: Double) -> String? {
+    static func note(_ subtitles: Subtitles) -> String? {
         if let error = subtitles.translationError { return error }
         switch subtitles.status {
         case .idle: return nil
@@ -56,6 +59,20 @@ struct SubtitleStrip: View {
             return subtitles.needsTranslation && !subtitles.cues.contains(where: { $0.translation != nil })
                 ? String(localized: "正在翻譯…") : nil
         }
+    }
+}
+
+/// 沒有字幕時：打開本機語音辨識。模型不在這台 Mac 上的話，按了才下載。
+struct SpeechOfferButton: View {
+    @Environment(Subtitles.self) private var subtitles
+
+    var body: some View {
+        Button(subtitles.model.state == .ready ? "用本機語音辨識" : "用本機語音辨識（下載 2.5 GB）") {
+            subtitles.speechFallback = true
+        }
+        .buttonStyle(.borderless)
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(Theme.amber)
     }
 }
 
@@ -86,11 +103,11 @@ struct SubtitleSettings: View {
             LabeledContent("翻譯", value: CodexTranslator.isInstalled
                            ? String(localized: "Codex · GPT-6 Luna · xhigh · 快速模式")
                            : String(localized: "找不到 codex"))
-            Text("有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。直播沒有字幕。翻好的存在快取，重聽不用再翻。")
+            Text("有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。翻好的存在快取，重聽不用再翻。")
                 .font(.caption).foregroundStyle(.secondary)
             Toggle("沒有字幕時用本機語音辨識", isOn: $subtitles.speechFallback)
             modelStatus
-            Text("用 Qwen3-ASR 1.7B 在這台 Mac 上辨識，不會上傳聲音。第一次打開要下載約 2.5 GB 的模型（Hugging Face）。")
+            Text("用 Qwen3-ASR 1.7B 在這台 Mac 上辨識，不會上傳聲音。第一次打開要下載約 2.5 GB 的模型（Hugging Face）。直播一定沒有字幕：模型下載過就自動聽寫，這個開關關著也一樣。")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

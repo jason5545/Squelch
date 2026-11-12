@@ -70,6 +70,24 @@ extension SelfTest {
               && tail.count == 1 && tail[0].startSample == cut[0].endSample && tail[0].endSeconds == 64,
               "speech: segmenter cuts at the quiet spot, timeline from 60s")
 
+        // 直播播放清單：時間 = 開頭的 PROGRAM-DATE-TIME 加上前面各段的長度，序號從 MEDIA-SEQUENCE 起算。
+        let livePlaylist = """
+        #EXTM3U
+        #EXT-X-TARGETDURATION:5
+        #EXT-X-MEDIA-SEQUENCE:407270
+        #EXT-X-PROGRAM-DATE-TIME:2026-11-12T04:50:53.749+00:00
+        #EXTINF:5.0,
+        https://x.test/sq/407270/seg.ts
+        #EXTINF:5.0,
+        https://x.test/sq/407271/seg.ts
+        #EXTINF:4.5,
+        https://x.test/sq/407272/seg.ts
+        """
+        let live = LiveHLSChunks.parse(livePlaylist, baseURL: URL(string: "https://x.test/index.m3u8")!)
+        check(live.count == 3 && live[0].sequence == 407270 && live[2].sequence == 407272
+              && abs(live[0].start - 1794459053.749) < 0.001 && abs(live[2].start - live[0].start - 10) < 0.001,
+              "speech: live playlist segment times from PROGRAM-DATE-TIME")
+
         // 轉成 16 kHz 單聲道：1 秒的 48 kHz 立體聲 → 約 16000 個取樣，左右平均。
         let stereo = (0..<48_000).flatMap { i -> [Float] in [0.5, 0.1] }
         let mono = MonoResampler(sampleRate: 48_000)?.convert(stereo, channels: 2) ?? []
