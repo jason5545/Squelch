@@ -28,6 +28,22 @@
 - 介面有正體中文、English、日本語、简体中文，跟著系統語言；其他語言顯示英文
 - 登入 YouTube（選用）：多一個「訂閱動態」，播放紀錄和進度會回報給 YouTube，網頁版和手機可以接著看
 
+## 跟現成的比
+
+Squelch 的基本功能，別的工具大多已經有了。只需要免登入訂閱、只聽聲音、跳過業配的話，FreeTube 就夠了。以下是 2026/11/12 查過的：
+
+- [FreeTube](https://github.com/FreeTubeApp/FreeTube)：免帳號訂閱、SponsorBlock、純音訊模式（設定的「預設媒體格式」，README 沒寫）、記住進度都有。用 shaka-player 加 `<video>` 播，純音訊模式是 `manifest.disableVideo`；直播只有 iOS 那份 HLS 有獨立音訊，拿不到就不能只聽聲音。音量最高 100%（`changeVolume` 上限 100，沒有增益節點），字幕可以選 YouTube 自動翻譯的軌。Electron，Windows、Linux 也能用。
+- [Yattee](https://github.com/yattee/yattee)：Swift 原生，有 macOS 版，有 SponsorBlock、待播清單、背景播放。以看影片為主；第 2 版還在測試，搭配自己架的 Yattee Server。
+- [Kaset](https://github.com/sozercan/kaset)：原生的 YouTube Music 和 YouTube 客戶端，要登入 Google，用 WebView 播影片。Squelch 的登入做法參考它（見「登入」）。
+- [Podsync](https://github.com/mxpv/podsync)、[PigeonPod](https://github.com/aizhimou/pigeon-pod)：把頻道轉成 podcast RSS，用一般的 podcast App 聽。要自己架伺服器，先下載成音檔再聽。Pocket Casts 官方不支援 YouTube 頻道。
+- 沉浸式翻譯這類瀏覽器擴充功能：在 YouTube 網頁上用 AI 翻字幕。Squelch 不在瀏覽器裡播，用不到。
+
+Squelch 多做的是這三件：
+
+1. 音量放大到 200%（見「音量放大」）。YouTube 講話影片比 Spotify 小聲約 7 dB，瀏覽器的 `<video>` 和 AVPlayer 都只到 100%。
+2. 只抓音軌的原生 macOS App，自己解碼 HLS 純音訊分段。FreeTube 直播走的也是 itag 233／234 的純音訊 HLS（它把分段副檔名從 `.ts` 改成 `.aac`），但交給 `<video>` 播。
+3. 字幕翻譯和本機聽寫在同一個播放器裡（見「字幕」），直播也能聽寫。
+
 ## 下載
 
 [GitHub Releases](https://github.com/jason5545/Squelch/releases/latest) 有 Developer ID 簽章、Apple 公證過的版本，解壓縮後拖進「應用程式」就能開。介紹頁：<https://squelch.hiroki.im/>
