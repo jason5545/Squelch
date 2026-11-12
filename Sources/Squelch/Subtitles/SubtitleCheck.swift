@@ -11,6 +11,9 @@ enum SubtitleCheck {
         }
         let id = arguments[index + 1]
         let speechSeconds = arguments.firstIndex(of: "--speech").flatMap { $0 + 1 < arguments.count ? Double(arguments[$0 + 1]) : nil }
+        // `--target en`：翻成指定的語言（預設跟著介面語言）。
+        let target = arguments.firstIndex(of: "--target").flatMap { $0 + 1 < arguments.count ? SubtitleTarget(rawValue: arguments[$0 + 1]) : nil } ?? .system
+        print("目標語言：\(target.name)")
         do {
             var clock = Date()
             let stream = try await YTDLP.resolve(videoID: id)
@@ -53,13 +56,13 @@ enum SubtitleCheck {
                 cues = await box.cues.filter { $0.start < speechSeconds }
                 print("辨識前 \(Int(speechSeconds)) 秒：\(String(format: "%.1f", -clock.timeIntervalSinceNow)) 秒，\(cues.count) 句")
             } else {
-                guard let track = stream.captions else {
+                guard let sources = stream.captions, let track = Captions.choose(sources, target: target) else {
                     print("FAIL 這部沒有可用的字幕")
                     return false
                 }
                 print("字幕：\(track.language) \(track.isAuto ? "自動" : "人工") \(track.handling.rawValue)")
                 clock = Date()
-                cues = try await Captions.fetch(track, headers: stream.headers)
+                cues = try await Captions.fetch(track, target: target, headers: stream.headers)
                 print("抓字幕：\(String(format: "%.1f", -clock.timeIntervalSinceNow)) 秒，\(cues.count) 句，到 \(Format.time(cues.last?.end ?? 0))")
                 if track.handling != .translate {
                     for cue in cues.prefix(6) { print("  \(Format.time(cue.start)) \(cue.translation ?? "")") }
@@ -72,7 +75,7 @@ enum SubtitleCheck {
             }
             let picked = Array(cues.filter { $0.translation == nil }.prefix(6))
             let batch = CodexTranslator.Batch(
-                title: stream.title, channel: stream.channelTitle,
+                target: target, title: stream.title, channel: stream.channelTitle,
                 items: picked.enumerated().map { CodexTranslator.Item(id: $0.offset + 1, text: $0.element.text) },
                 before: [], after: cues.dropFirst(picked.count).prefix(2).map(\.text))
             clock = Date()
@@ -120,7 +123,7 @@ enum SubtitleFlowCheck {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-subtitle-flow-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
-        let cacheFile = Subtitles.cacheDirectory.appendingPathComponent("\(id).json")
+        let cacheFile = Subtitles.cacheFile(id, .zhHant)
         try? FileManager.default.removeItem(at: cacheFile)
 
         guard let stream = try? await YTDLP.resolve(videoID: id) else {

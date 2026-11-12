@@ -178,11 +178,21 @@ actor SpeechTranscriber {
     private func recognize(_ segment: PCMSegment, emit: @Sendable (Cue?, Double) async -> Void) async throws {
         let result = try await recognizer.transcribe(segment.samples)
         guard !result.text.isEmpty else { return }
-        var cue = Cue(start: segment.startSeconds, end: segment.endSeconds, text: result.text)
-        if result.language?.lowercased().contains("chinese") == true || result.language?.lowercased().contains("cantonese") == true {
-            cue.translation = Captions.toTraditional(result.text)
-        }
+        let cue = Cue(start: segment.startSeconds, end: segment.endSeconds, text: result.text,
+                      language: Self.code(result.language))
         await emit(cue, segment.endSeconds)
+    }
+
+    /// Qwen3-ASR 回報的語言名稱 → 語言代碼。認不得的留 nil（照樣送翻譯）。
+    static func code(_ name: String?) -> String? {
+        switch name?.lowercased() {
+        case "english": "en"
+        case "japanese": "ja"
+        case "chinese": "zh"
+        case "cantonese": "yue"
+        case "korean": "ko"
+        default: nil
+        }
     }
 }
 

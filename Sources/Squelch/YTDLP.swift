@@ -320,17 +320,17 @@ nonisolated enum YTDLP {
                               channelTitle: obj["channel"] as? String ?? obj["uploader"] as? String ?? "",
                               channelID: channelID, expires: expires,
                               isLive: (obj["is_live"] as? Bool) ?? false,
-                              captions: Captions.choose(obj))
+                              captions: Captions.sources(obj))
     }
 
     /// 只查字幕：本機快取檔播放時用。不帶帳號，跟 `resolve` 一樣。
-    static func captions(videoID: String) async throws -> CaptionTrack? {
+    static func captions(videoID: String) async throws -> CaptionSources? {
         let data = try await run([
             "-j", "--skip-download", "--no-playlist", "--ignore-no-formats-error", "--socket-timeout", "15",
             "https://www.youtube.com/watch?v=\(videoID)",
         ])
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw YTDLPError.badOutput }
-        return Captions.choose(obj)
+        return Captions.sources(obj)
     }
 
     static func version() async -> String? {

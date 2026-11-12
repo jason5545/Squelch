@@ -4,24 +4,35 @@ import SquelchASR
 /// 字幕的自我測試。不呼叫 Codex（要額度）、不載入語音模型（2.5 GB），那兩段用 `--subtitle-check` 另外測。
 extension SelfTest {
     static func subtitleUnits() {
-        // 挑字幕軌：人工正體中文 > 原文人工 > 原文自動；YouTube 自動翻譯的 zh-Hant 不用。
-        func info(_ subs: [String], _ auto: [String], language: String?) -> [String: Any] {
-            func formats(_ keys: [String]) -> [String: [[String: Any]]] {
-                Dictionary(uniqueKeysWithValues: keys.map { ($0, [["ext": "json3", "url": "https://x.test/\($0)"]]) })
+        // 挑字幕軌：目標語言的人工字幕 > 原文人工 > 原文自動；YouTube 自動翻譯的軌不用。
+        func info(_ subs: [String], _ auto: [String], language: String?) -> CaptionSources {
+            func urls(_ keys: [String]) -> [String: URL] {
+                Dictionary(uniqueKeysWithValues: keys.map { ($0, URL(string: "https://x.test/\($0)")!) })
             }
-            var obj: [String: Any] = ["subtitles": formats(subs), "automatic_captions": formats(auto)]
-            if let language { obj["language"] = language }
-            return obj
+            return CaptionSources(manual: urls(subs), auto: urls(auto), original: language)
         }
-        let zhManual = Captions.choose(info(["en", "zh-TW"], ["en-orig", "zh-Hant"], language: "en"))
-        check(zhManual?.language == "zh-TW" && zhManual?.handling == .direct, "captions: manual zh-TW shown as-is")
-        let original = Captions.choose(info(["en"], ["en-orig", "zh-Hant"], language: "en"))
-        check(original?.language == "en" && original?.isAuto == false && original?.handling == .translate, "captions: manual original language")
-        let auto = Captions.choose(info(["live_chat"], ["ja-orig", "ja", "zh-Hant"], language: "ja"))
-        check(auto?.language == "ja" && auto?.isAuto == true && auto?.url.lastPathComponent == "ja-orig", "captions: auto original, not YouTube's translation")
-        let chinese = Captions.choose(info([], ["zh-Hans-orig", "zh-Hant"], language: "zh-Hans"))
-        check(chinese?.handling == .convert, "captions: Chinese source only converted")
-        check(Captions.choose(info([], ["zh-Hant", "fr"], language: "en")) == nil, "captions: none when only translated tracks")
+        let both = info(["en", "zh-TW"], ["en-orig", "zh-Hant"], language: "en")
+        let zhManual = Captions.choose(both, target: .zhHant)
+        check(zhManual?.language == "zh-TW" && zhManual?.handling == .direct, "captions: manual in the target language shown as-is")
+        let enTarget = Captions.choose(both, target: .en)
+        check(enTarget?.language == "en" && enTarget?.handling == .direct, "captions: English target uses English captions without translating")
+        let original = Captions.choose(info(["en"], ["en-orig", "zh-Hant"], language: "en"), target: .ja)
+        check(original?.language == "en" && original?.isAuto == false && original?.handling == .translate, "captions: manual original language, translated to Japanese")
+        let auto = Captions.choose(info(["live_chat"], ["ja-orig", "ja", "zh-Hant"], language: "ja"), target: .zhHant)
+        check(auto?.language == "ja" && auto?.isAuto == true && auto?.url.lastPathComponent == "ja-orig" && auto?.handling == .translate,
+              "captions: auto original, not YouTube's translation")
+        let autoJa = Captions.choose(info([], ["ja-orig", "en"], language: "ja"), target: .ja)
+        check(autoJa?.handling == .direct, "captions: auto captions already in the target language")
+        let chinese = info([], ["zh-Hans-orig", "zh-Hant"], language: "zh-Hans")
+        check(Captions.choose(chinese, target: .zhHant)?.handling == .convert && Captions.choose(chinese, target: .zhHans)?.handling == .convert
+              && Captions.choose(chinese, target: .en)?.handling == .translate, "captions: Chinese to Chinese only converted")
+        check(Captions.choose(info([], ["zh-Hant", "fr"], language: "en"), target: .zhHant) == nil, "captions: none when only translated tracks")
+        check(SubtitleTarget.zhHant.convert("软件和网络") == "軟件和網絡" && SubtitleTarget.zhHans.convert("軟件和網絡") == "软件和网络",
+              "captions: Chinese script conversion both ways")
+        check(SubtitleTarget.en.handling(for: "en", isAuto: true) == .direct && SubtitleTarget.zhHans.handling(for: "zh", isAuto: true) == .convert
+              && SubtitleTarget.ja.handling(for: "zh", isAuto: true) == .translate, "speech: detected language decides translate or not")
+        check(SpeechTranscriber.code("Japanese") == "ja" && SpeechTranscriber.code("Chinese") == "zh" && SpeechTranscriber.code("Klingon") == nil,
+              "speech: recognizer language names to codes")
 
         // json3：人工一句一個事件；自動字幕逐字，跨行接字要補空格。
         let manual = Captions.parseManual(Data(#"{"events":[{"tStartMs":5200,"dDurationMs":1041,"segs":[{"utf8":"Too hot!"}]},{"tStartMs":7000,"dDurationMs":900,"segs":[{"utf8":"Line one\nline two"}]}]}"#.utf8))
@@ -40,7 +51,6 @@ extension SelfTest {
         check(words.map(\.text) == ["Sorry about that.", "I", "blame YouTube."] && words[0].start == 1 && words[2].start == 5,
               "captions: auto json3 joins words, breaks at sentence ends and pauses \(words.map(\.text))")
         check(Captions.join(["今日は", "いい", "天気"]) == "今日はいい天気" && Captions.join(["Hi", "there", ","]) == "Hi there,", "captions: join spacing")
-        check(Captions.toTraditional("软件和网络") == "軟件和網絡", "captions: Chinese converted to traditional characters")
 
         // 顯示：找這個時間的那句；句尾留 1 秒，或到下一句開始。
         let subs = Subtitles(preview: [Cue(start: 1, end: 2, text: "a"), Cue(start: 2.5, end: 4, text: "b"), Cue(start: 9, end: 10, text: "c")], enabled: true)
@@ -52,8 +62,9 @@ extension SelfTest {
         let parsed = try? CodexTranslator.parse(#"ok {"items":[{"id":1,"translation":"一"},{"id":2,"translation":" 二 "},{"id":9,"translation":"多"}]}"#, expected: [1, 2])
         check(parsed == [1: "一", 2: "二"], "translator: parses batch JSON")
         check((try? CodexTranslator.parse(#"{"items":[{"id":1,"translation":"一"}]}"#, expected: [1, 2])) == nil, "translator: rejects missing ids")
-        let prompt = CodexTranslator.prompt(.init(title: "T", channel: "C", items: [.init(id: 1, text: "hello")], before: [("hi", "嗨")], after: ["bye"]))
-        check(prompt.contains("[1] hello") && prompt.contains("- hi → 嗨") && prompt.contains("- bye"), "translator: prompt carries context")
+        let prompt = CodexTranslator.prompt(.init(target: .ja, title: "T", channel: "C", items: [.init(id: 1, text: "hello")], before: [("hi", "やあ")], after: ["bye"]))
+        check(prompt.contains("[1] hello") && prompt.contains("- hi → やあ") && prompt.contains("- bye") && prompt.contains("自然な日本語")
+              && CodexTranslator.instructions(.en).contains("natural English"), "translator: prompt carries context and target language")
 
         // 切段：在安靜的地方切，時間接得上。
         var config = PCMSegmenter.Config()
@@ -97,12 +108,12 @@ extension SelfTest {
 
     /// 真的抓這部的字幕（不翻譯），也照語音辨識的路徑抓一段 HLS 解成 16 kHz（不載入模型）。
     static func subtitles(_ stream: ResolvedStream, videoID: String) async {
-        guard let track = stream.captions else {
+        guard let sources = stream.captions, let track = Captions.choose(sources, target: .zhHant) else {
             check(false, "subtitles: resolve found no caption track")
             return
         }
         do {
-            let cues = try await Captions.fetch(track, headers: stream.headers)
+            let cues = try await Captions.fetch(track, target: .zhHant, headers: stream.headers)
             check(cues.count > 20 && zip(cues, cues.dropFirst()).allSatisfy { $0.start <= $1.start },
                   "subtitles: fetched \(track.language) \(track.isAuto ? "auto" : "manual") captions: \(cues.count) cues")
         } catch {
@@ -122,7 +133,8 @@ extension SelfTest {
             check(false, "speech: HLS: \(error.localizedDescription)")
         }
         do {
-            let track = try await YTDLP.captions(videoID: videoID)
+            let sources = try await YTDLP.captions(videoID: videoID)
+            let track = sources.flatMap { Captions.choose($0, target: .zhHant) }
             check(track?.url.absoluteString.contains("timedtext") == true, "subtitles: caption lookup for local files")
         } catch {
             check(false, "subtitles: caption lookup: \(error.localizedDescription)")

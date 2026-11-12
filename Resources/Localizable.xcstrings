@@ -2914,30 +2914,30 @@
         }
       }
     },
-    "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。翻好的存在快取，重聽不用再翻。": {
+    "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻譯，用的是你自己的 Codex 登入。有選定語言的字幕、或原文就是選定的語言時不翻，直接顯示；中文的正體、簡體之間只轉字。翻好的存在快取，重聽不用再翻。": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uses YouTube's subtitles when there are any (uploaded ones first, then auto-generated) and translates them into Traditional Chinese (Taiwan) with the Codex on this Mac, signed in with your own Codex account. Chinese videos aren't translated, only converted to Traditional characters. Translations are cached, so listening again doesn't translate again."
+            "value": "Uses YouTube's subtitles when there are any (uploaded ones first, then auto-generated) and translates them with the Codex on this Mac, signed in with your own Codex account. If there are subtitles in the chosen language, or the video is already in it, they're shown without translating; between Traditional and Simplified Chinese only the characters are converted. Translations are cached, so listening again doesn't translate again."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "YouTube の字幕があればそれを使い（アップロードされたものを優先、なければ自動字幕）、この Mac の Codex で繁体字中国語（台湾）に翻訳します。Codex はあなた自身のアカウントでログインしたものを使います。中国語の動画は翻訳せず、繁体字に変換するだけです。翻訳はキャッシュされるので、聴き直すときは再翻訳しません。"
+            "value": "YouTube の字幕があればそれを使い（アップロードされたものを優先、なければ自動字幕）、この Mac の Codex で翻訳します。Codex はあなた自身のアカウントでログインしたものを使います。選んだ言語の字幕がある場合や、動画がもともとその言語の場合は翻訳せずにそのまま表示します。繁体字と簡体字の中国語の間は文字を変換するだけです。翻訳はキャッシュされるので、聴き直すときは再翻訳しません。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 YouTube 字幕就用（人工上传的优先，其次是自动字幕），交给本机的 Codex 翻成繁体中文（台湾），用的是你自己的 Codex 登录。原文是中文的不翻，只转成繁体字。翻好的存在缓存，重听不用再翻。"
+            "value": "有 YouTube 字幕就用（人工上传的优先，其次是自动字幕），交给本机的 Codex 翻译，用的是你自己的 Codex 登录。有选定语言的字幕、或原文就是选定的语言时不翻，直接显示；中文的繁体、简体之间只转字。翻好的存在缓存，重听不用再翻。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。翻好的存在快取，重聽不用再翻。"
+            "value": "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻譯，用的是你自己的 Codex 登入。有選定語言的字幕、或原文就是選定的語言時不翻，直接顯示；中文的正體、簡體之間只轉字。翻好的存在快取，重聽不用再翻。"
           }
         }
       }
@@ -4510,6 +4510,34 @@
         }
       }
     },
+    "翻成": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Translate to"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻訳先"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻成"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻成"
+          }
+        }
+      }
+    },
     "翻譯": {
       "localizations": {
         "en": {
@@ -5010,6 +5038,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "超過 100% 要先下載音軌"
+          }
+        }
+      }
+    },
+    "跟著介面語言（%@）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same as the app (%@)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリと同じ（%@）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随界面语言（%@）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟著介面語言（%@）"
           }
         }
       }
@@ -5798,30 +5854,30 @@
         }
       }
     },
-    "顯示字幕（翻成正體中文）": {
+    "顯示字幕（翻成%@）": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Show subtitles (translated into Traditional Chinese)"
+            "value": "Show subtitles (translated into %@)"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "字幕を表示（繁体字中国語に翻訳）"
+            "value": "字幕を表示（%@に翻訳）"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "显示字幕（翻成繁体中文）"
+            "value": "显示字幕（翻成%@）"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "顯示字幕（翻成正體中文）"
+            "value": "顯示字幕（翻成%@）"
           }
         }
       }

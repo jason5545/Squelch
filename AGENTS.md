@@ -11,7 +11,7 @@
 - 一般影片的 HLS 由 `SegmentPlayer` 自己解碼（為了能放大超過 100%），直播和本機檔才交給 AVPlayer。`Player` 裡兩邊都要顧：碰播放、暫停、跳轉、速度、音量的地方，先看 `segmentPlayer` 是不是 nil。`SegmentPlayer` 解不了的格式會回報 `unsupported`，那一集退回 AVPlayer，這條備援不要拿掉（`Player.useSegments = false` 可以強迫走備援，自我測試在用）。
 - `SegmentPlayer` 不看 renderer 的 `isReadyForMoreMediaData`（它排滿約 1 秒就說不用再給，3 倍速時不夠撐），也不要把 `delaysRateChangeUntilHasSufficientMediaData` 關掉（起播的聲音會被吃掉）。原因和實測數字在該檔的註解。
 - 介面字串的原文是正體中文，翻譯在 `Resources/Localizable.xcstrings`（英、日、簡；正體中文那欄就是原文）。SwiftUI 的 `Text`、`Button`、`Label` 這類直接吃字串字面值的會自動翻譯；其他回傳 `String` 的（錯誤訊息、狀態列、`navigationTitle`、`show(...)`）一律包 `String(localized:)`。加了或改了字串，`make build` 之後跑 `scripts/sync-strings.sh` 把新字串收進目錄，再補英日簡翻譯和正體中文欄；它會列出還沒翻的字串，清單是空的才算完成。開發地區是英文：系統語言不是這四種時顯示英文。
-- 字幕在 `Sources/Squelch/Subtitles/`，做法和實測數字寫在 README 的「字幕」。翻譯固定走本機 `codex app-server`（GPT-6 Luna、xhigh、`serviceTier: priority`），不要改成 API key。自我測試只測不花錢的部分（挑軌、解析、切段、轉取樣率、抓一段 HLS），不呼叫 Codex、不載入語音模型；改到翻譯或辨識時另外跑 `--subtitle-check`、`--subtitle-flow`，會花 Codex 額度。
+- 字幕在 `Sources/Squelch/Subtitles/`，做法和實測數字寫在 README 的「字幕」。翻譯固定走本機 `codex app-server`（GPT-6 Luna、xhigh、`serviceTier: priority`），不要改成 API key。目標語言預設跟著介面語言，跟介面一樣是四種（`SubtitleTarget`）；加介面語言時一起加。自我測試只測不花錢的部分（挑軌、解析、切段、轉取樣率、抓一段 HLS），不呼叫 Codex、不載入語音模型；改到翻譯或辨識時另外跑 `--subtitle-check`、`--subtitle-flow`，會花 Codex 額度。
 - 語音辨識的 MLX 程式碼在 `Packages/SquelchASR`（Swift 5 模式），App 不直接 import MLX。字幕預設關、語音辨識預設關，打開才準備模型，不要改成預設下載。
 - repo 是公開的。個人的頻道清單只存在本機的 `library.json`，不要寫進程式碼、測試或文件。
 

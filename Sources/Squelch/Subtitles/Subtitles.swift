@@ -5,7 +5,8 @@ import Observation
 /// 直播沒有字幕可抓：模型已經在這台 Mac 上就直接聽寫，不然要使用者按一下才下載模型。直播的時間軸是實際時間（UNIX 秒）。
 ///
 /// 翻譯和辨識都跑在播放位置前面：翻譯先翻接下來 5 分鐘內的句子，一次最多兩批；辨識最多做到播放位置後 3 分鐘。
-/// 結果存在 `~/Library/Caches/Squelch/subtitles/<影片 ID>.json`，重聽不用再翻。
+/// 翻成哪種語言預設跟著介面語言（正體中文、简体中文、English、日本語），設定裡可以改。
+/// 結果存在 `~/Library/Caches/Squelch/subtitles/<影片 ID>.<目標語言>.json`，重聽不用再翻。
 @MainActor @Observable
 final class Subtitles {
     enum Status: Equatable {
@@ -46,6 +47,16 @@ final class Subtitles {
         }
     }
 
+    /// 翻成哪種語言。空字串是跟著介面語言。
+    var language: String {
+        didSet {
+            UserDefaults.standard.set(language, forKey: Self.languageKey)
+            // 換語言：已經翻好的不能用，重新來過（各語言的快取分開存）。
+            if enabled { reattach() }
+        }
+    }
+    var target: SubtitleTarget { SubtitleTarget(rawValue: language) ?? .system }
+
     private(set) var cues: [Cue] = []
     private(set) var status: Status = .idle
     /// 最近一次翻譯失敗的原因。成功一次就清掉。
@@ -58,8 +69,9 @@ final class Subtitles {
 
     static let enabledKey = "subtitles"
     static let speechKey = "subtitlesSpeech"
+    static let languageKey = "subtitlesLanguage"
     /// 換了解析方式就加一，舊的快取不用。
-    static let cacheVersion = 1
+    static let cacheVersion = 2
 
     @ObservationIgnored weak var player: Player?
     @ObservationIgnored private var episode: Episode?
@@ -78,12 +90,14 @@ final class Subtitles {
     init() {
         enabled = UserDefaults.standard.bool(forKey: Self.enabledKey)
         speechFallback = UserDefaults.standard.bool(forKey: Self.speechKey)
+        language = UserDefaults.standard.string(forKey: Self.languageKey) ?? ""
     }
 
     /// 截圖用：直接給字幕，不讀也不寫設定。
     init(preview: [Cue], enabled: Bool) {
         self.enabled = enabled
         speechFallback = false
+        language = SubtitleTarget.zhHant.rawValue
         cues = preview
         status = .captions(language: "en", auto: false)
         needsTranslation = true
@@ -154,8 +168,9 @@ final class Subtitles {
         guard let ep = episode, let stream else { return }
         status = .loading
         offerSpeech = false
+        let target = target
         loadTask = Task {
-            if let cached = Self.readCache(ep.id) {
+            if let cached = Self.readCache(ep.id, target) {
                 cues = cached.cues
                 needsTranslation = cached.needsTranslation
                 status = cached.status
@@ -167,11 +182,11 @@ final class Subtitles {
                 return
             }
             do {
-                var track = stream.captions
-                if track == nil, stream.isLocal { track = try await YTDLP.captions(videoID: ep.id) }
+                var sources = stream.captions
+                if sources == nil, stream.isLocal { sources = try await YTDLP.captions(videoID: ep.id) }
                 guard !Task.isCancelled, episode?.id == ep.id else { return }
-                if let track {
-                    let found = try await Captions.fetch(track, headers: stream.headers)
+                if let sources, let track = Captions.choose(sources, target: target) {
+                    let found = try await Captions.fetch(track, target: target, headers: stream.headers)
                     guard !Task.isCancelled, episode?.id == ep.id else { return }
                     if !found.isEmpty {
                         cues = found
@@ -241,7 +256,7 @@ final class Subtitles {
         let before = cues[max(0, first - 4)..<first].map { ($0.text, $0.translation) }
         let lastIndex = picked.last!
         let after = cues[(lastIndex + 1)..<min(cues.count, lastIndex + 3)].map(\.text)
-        let batch = CodexTranslator.Batch(title: ep.title, channel: ep.channelTitle, items: items,
+        let batch = CodexTranslator.Batch(target: target, title: ep.title, channel: ep.channelTitle, items: items,
                                           before: Array(before), after: Array(after))
         starts.forEach { inFlight.insert($0) }
         batches += 1
@@ -252,7 +267,7 @@ final class Subtitles {
             }
             do {
                 let result = try await translator.translate(batch)
-                guard episode?.id == ep.id else { return }
+                guard episode?.id == ep.id, target == batch.target else { return }
                 for (n, start) in starts.enumerated() {
                     if let i = cues.firstIndex(where: { $0.start == start }) { cues[i].translation = result[n + 1] }
                 }
@@ -375,7 +390,15 @@ final class Subtitles {
             return
         }
         mark(range.lowerBound...max(range.upperBound, reached))
-        if let cue {
+        if var cue {
+            // 偵測到的語言就是目標語言：直接顯示；中文對中文：正簡轉換。其他留給翻譯。
+            if let language = cue.language {
+                switch target.handling(for: language, isAuto: true) {
+                case .direct: cue.translation = cue.text
+                case .convert: cue.translation = target.convert(cue.text)
+                case .translate: break
+                }
+            }
             let index = cues.firstIndex { $0.start > cue.start } ?? cues.count
             cues.insert(cue, at: index)
         }
@@ -411,8 +434,12 @@ final class Subtitles {
             .appendingPathComponent("Squelch/subtitles", isDirectory: true)
     }
 
-    private static func readCache(_ id: String) -> CacheFile? {
-        let url = cacheDirectory.appendingPathComponent("\(id).json")
+    nonisolated static func cacheFile(_ id: String, _ target: SubtitleTarget) -> URL {
+        cacheDirectory.appendingPathComponent("\(id).\(target.rawValue).json")
+    }
+
+    private static func readCache(_ id: String, _ target: SubtitleTarget) -> CacheFile? {
+        let url = cacheFile(id, target)
         guard let data = try? Data(contentsOf: url),
               let file = try? JSONDecoder().decode(CacheFile.self, from: data),
               file.version == cacheVersion, !file.cues.isEmpty || file.speech else { return nil }
@@ -424,18 +451,19 @@ final class Subtitles {
         guard let ep = episode else { return }
         var file = CacheFile(version: Self.cacheVersion, language: nil, auto: nil, speech: status == .speech,
                              needsTranslation: needsTranslation, cues: cues,
-                             heard: heard.map { [$0.lowerBound, min($0.upperBound, 1e9)] })
+                             heard: heard.map { [$0.lowerBound, min($0.upperBound, 1e12)] })
         if case .captions(let language, let auto) = status {
             file.language = language
             file.auto = auto
         }
+        let url = Self.cacheFile(ep.id, target)
         saveTask?.cancel()
         saveTask = Task.detached(priority: .utility) {
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled, let data = try? JSONEncoder().encode(file) else { return }
             let dir = Self.cacheDirectory
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            try? data.write(to: dir.appendingPathComponent("\(ep.id).json"), options: .atomic)
+            try? data.write(to: url, options: .atomic)
         }
     }
 }

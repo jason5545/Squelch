@@ -17,6 +17,7 @@ actor CodexTranslator {
     }
 
     struct Batch: Sendable {
+        var target: SubtitleTarget
         var title: String
         var channel: String
         var items: [Item]
@@ -62,7 +63,7 @@ actor CodexTranslator {
             "approvalPolicy": "never",
             "sandbox": "read-only",
             "ephemeral": true,
-            "developerInstructions": Self.instructions,
+            "developerInstructions": Self.instructions(batch.target),
             "serviceName": "squelch",
             "model": Self.model,
             "serviceTier": Self.serviceTier,
@@ -100,13 +101,16 @@ actor CodexTranslator {
 
     // MARK: 提示
 
-    static let instructions = """
-    你是 YouTube 影片的字幕翻譯。把字幕翻成臺灣用語的正體中文。
-    - 口語、自然、簡短，像字幕，不要翻譯腔。專有名詞、產品名、人名保留原文或用臺灣通行的譯名。
-    - 一個 id 一句，不合併、不拆開、不漏掉；語意跨句時照中文語序分配，但每句都要有內容。
-    - 自動字幕可能有聽錯的字，依上下文修正後再翻。
-    - 只輸出要求的 JSON，不要解釋。
-    """
+    static func instructions(_ target: SubtitleTarget) -> String {
+        """
+        你是 YouTube 影片的字幕翻譯。把字幕翻成\(target.promptName)（\(target.name)）。
+        - 口語、自然、簡短，像字幕，不要翻譯腔。專有名詞、產品名、人名保留原文或用\(target.name)通行的譯名。
+        - 一個 id 一句，不合併、不拆開、不漏掉；語意跨句時照譯文的語序分配，但每句都要有內容。
+        - 自動字幕可能有聽錯的字，依上下文修正後再翻。
+        - 已經是\(target.name)的句子照抄。
+        - 只輸出要求的 JSON，不要解釋。
+        """
+    }
 
     static func prompt(_ batch: Batch) -> String {
         var lines = ["影片：\(batch.title)（\(batch.channel)）", ""]
@@ -125,7 +129,7 @@ actor CodexTranslator {
             for source in batch.after { lines.append("- \(source)") }
         }
         lines.append("")
-        lines.append("回傳 {\"items\": [{\"id\": 編號, \"translation\": \"譯文\"}, …]}，每個 id 剛好一次，照原本的順序。")
+        lines.append("翻成\(batch.target.promptName)。回傳 {\"items\": [{\"id\": 編號, \"translation\": \"譯文\"}, …]}，每個 id 剛好一次，照原本的順序。")
         return lines.joined(separator: "\n")
     }
 

@@ -88,7 +88,7 @@ struct SubtitleToggle: View {
                 .frame(width: 24, height: 24)
         }
         .buttonStyle(GlyphButtonStyle(active: subtitles.enabled))
-        .help(subtitles.enabled ? "關掉字幕" : "顯示字幕（翻成正體中文）")
+        .help(subtitles.enabled ? String(localized: "關掉字幕") : String(localized: "顯示字幕（翻成\(subtitles.target.name)）"))
     }
 }
 
@@ -100,10 +100,16 @@ struct SubtitleSettings: View {
         @Bindable var subtitles = subtitles
         Section("字幕") {
             Toggle("顯示字幕", isOn: $subtitles.enabled)
+            Picker("翻成", selection: $subtitles.language) {
+                Text("跟著介面語言（\(SubtitleTarget.system.name)）").tag("")
+                ForEach(SubtitleTarget.allCases, id: \.self) { target in
+                    Text(verbatim: target.name).tag(target.rawValue)
+                }
+            }
             LabeledContent("翻譯", value: CodexTranslator.isInstalled
                            ? String(localized: "Codex · GPT-6 Luna · xhigh · 快速模式")
                            : String(localized: "找不到 codex"))
-            Text("有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。翻好的存在快取，重聽不用再翻。")
+            Text("有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻譯，用的是你自己的 Codex 登入。有選定語言的字幕、或原文就是選定的語言時不翻，直接顯示；中文的正體、簡體之間只轉字。翻好的存在快取，重聽不用再翻。")
                 .font(.caption).foregroundStyle(.secondary)
             Toggle("沒有字幕時用本機語音辨識", isOn: $subtitles.speechFallback)
             modelStatus
