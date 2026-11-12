@@ -80,7 +80,7 @@ private struct BarTransport: View {
             }
             .buttonStyle(GlyphButtonStyle())
             .help("倒退 15 秒（⌘←）")
-            .disabled(player.isLive)
+            .disabled(player.isLive && !player.canSeekLive)
             PlayCircle(size: 38, playing: player.isPlaying,
                        loading: player.isLoading || (player.isPlaying && player.isBuffering)) { player.toggle() }
                 .help("播放／暫停（空白鍵、⌘↩）")
@@ -89,7 +89,7 @@ private struct BarTransport: View {
             }
             .buttonStyle(GlyphButtonStyle())
             .help("快轉 30 秒（⌘→）")
-            .disabled(player.isLive)
+            .disabled(player.isLive && (!player.canSeekLive || player.isAtLiveEdge))
             Button { player.playNext() } label: {
                 Image(systemName: "forward.end.fill").font(.system(size: 15, weight: .semibold))
             }
@@ -100,19 +100,34 @@ private struct BarTransport: View {
     }
 }
 
-/// 進度條、SponsorBlock 片段、經過／剩下的時間碼。直播只顯示已聽多久。
+/// 進度條、SponsorBlock 片段、經過／剩下的時間碼。直播不顯示聽了多久：能回放的顯示落後最新多少和「回到直播」，不能的只標「直播中」。
 private struct BarTimeline: View {
     @Environment(Player.self) private var player
     @State private var scrubbing: Double?
 
     var body: some View {
-        if player.isLive {
+        if player.isLive && player.canSeekLive, let window = player.liveWindow {
+            // 有回放窗口的直播：可以往回拉，左邊是落後最新多少，右邊一鍵回到最新。
+            let time = scrubbing ?? player.liveTime
+            let behind = max(0, window.upperBound - time)
+            let atEdge = scrubbing == nil ? player.isAtLiveEdge : behind < 15
+            HStack(spacing: 10) {
+                Text(atEdge ? "0:00" : "-" + Format.time(behind))
+                    .frame(width: 56, alignment: .trailing)
+                ThinSlider(value: time, range: window, fill: Theme.live) { scrubbing = $0 } onEnded: { target in
+                    player.seekLive(to: target)
+                    scrubbing = nil
+                }
+                .help("拖曳可以往回聽")
+                LiveBadge(atEdge: atEdge) { player.goLive() }
+                    .frame(width: 56, alignment: .leading)
+            }
+            .font(.timecodeSmall)
+            .foregroundStyle(.secondary)
+        } else if player.isLive {
             HStack(spacing: 6) {
                 Circle().fill(Theme.live).frame(width: 7, height: 7)
                 Text("直播中").font(.caption.weight(.bold)).foregroundStyle(Theme.live)
-                Text("已聽 \(Format.time(player.position))")
-                    .font(.timecodeSmall)
-                    .foregroundStyle(.secondary)
             }
             .frame(height: 16)
         } else {
@@ -133,6 +148,27 @@ private struct BarTimeline: View {
             .font(.timecodeSmall)
             .foregroundStyle(.secondary)
         }
+    }
+}
+
+/// 直播標記：在最新的地方是實心紅點「直播」；落後時變成可以按的「回到直播」。
+private struct LiveBadge: View {
+    var atEdge: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Circle().fill(atEdge ? Theme.live : Color.white.opacity(0.5)).frame(width: 6, height: 6)
+                Text(atEdge ? "直播" : "回到直播")
+                    .font(.caption2.weight(.bold))
+                    .fixedSize()
+            }
+            .foregroundStyle(atEdge ? Theme.live : Color.white.opacity(0.85))
+        }
+        .buttonStyle(.plain)
+        .disabled(atEdge)
+        .help(atEdge ? "正在聽最新的" : "跳回最新的地方")
     }
 }
 

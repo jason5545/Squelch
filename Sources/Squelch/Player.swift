@@ -71,6 +71,19 @@ final class Player {
     @ObservationIgnored private var stallTimer: Timer?
     @ObservationIgnored private var lastProgress: Double = -1
     @ObservationIgnored private var stalledSince: Date?
+    /// 直播：AVPlayer 的時間是在 YouTube 回放窗口（約 1 小時）裡的位置，一開播就是 3585 秒左右
+    /// （2026/11/12 實測，重新開播也一樣）。介面直播不顯示聽了多久；`position` 只給播放紀錄回報用，
+    /// 只把播放中、每次不到 2 秒的前進加上去，拉進度或回到直播造成的跳動不算。
+    @ObservationIgnored private var liveLastTick: Double?
+    /// 直播在回放窗口裡的位置（AVPlayer 的時間），和可以拉的範圍。
+    var liveTime: Double = 0
+    var liveWindow: ClosedRange<Double>?
+    /// 窗口至少 2 分鐘才算支援回放；沒有的直播只能聽最新的。
+    var canSeekLive: Bool { isLive && (liveWindow.map { $0.upperBound - $0.lowerBound } ?? 0) >= 120 }
+    /// 落後最新多少秒。剛開播約 0（AVPlayer 會停在窗口尾端附近）。
+    var liveBehind: Double { max(0, (liveWindow?.upperBound ?? liveTime) - liveTime) }
+    /// 落後不到 15 秒（YouTube 一段 5 秒，抖一兩段很正常）就算在最新。
+    var isAtLiveEdge: Bool { liveBehind < 15 }
 
     init(library: Library) {
         self.library = library
@@ -215,6 +228,8 @@ final class Player {
         retried = false
         isLive = ep.liveNow
         position = isLive ? 0 : library.resumePosition(for: ep)
+        liveTime = 0
+        liveWindow = nil
         duration = isLive ? 0 : ep.duration ?? 0
         teardownItem()
         nowPlaying.update()
@@ -272,6 +287,8 @@ final class Player {
 
     private func start(_ stream: ResolvedStream, at seconds: Double) {
         teardownItem()
+        liveLastTick = nil
+        liveWindow = nil
         isLocalPlayback = stream.isLocal
         if Self.useSegments, !segmentsUnsupported, !stream.isLocal, !stream.isLive, !isLive {
             startSegments(stream, at: seconds)
@@ -463,7 +480,14 @@ final class Player {
             pause()
         } else if avPlayer.currentItem == nil && segmentPlayer == nil {
             play(ep)
+        } else if isLive && !canSeekLive {
+            // 不能回放的直播：暫停再播一律接最新的。
+            goLive()
         } else {
+            // 暫停太久，停的地方已經滑出回放窗口：從窗口裡最舊的地方接。
+            if isLive, let window = currentLiveWindow(), avPlayer.currentTime().seconds < window.lowerBound + 5 {
+                avPlayer.seek(to: CMTime(seconds: window.lowerBound + 10, preferredTimescale: 600))
+            }
             enginePlay()
             isPlaying = true
             history?.resumed(at: position)
@@ -486,7 +510,49 @@ final class Player {
     }
 
     func skip(_ delta: Double) {
-        seek(to: position + delta)
+        if isLive {
+            seekLive(to: liveTime + delta)
+        } else {
+            seek(to: position + delta)
+        }
+    }
+
+    // MARK: 直播
+
+    private func currentLiveWindow() -> ClosedRange<Double>? {
+        guard let range = avPlayer.currentItem?.seekableTimeRanges.last?.timeRangeValue else { return nil }
+        let start = range.start.seconds, end = range.end.seconds
+        guard start.isFinite, end.isFinite, end > start else { return nil }
+        return start...end
+    }
+
+    /// 在回放窗口裡跳轉（AVPlayer 的時間）。窗口不夠長的直播不能拉。
+    func seekLive(to seconds: Double) {
+        guard isLive, !isLoading, segmentPlayer == nil else { return }
+        liveWindow = currentLiveWindow() ?? liveWindow
+        guard canSeekLive, let window = liveWindow else { return }
+        let target = min(max(seconds, window.lowerBound + 5), window.upperBound)
+        liveTime = target
+        liveLastTick = nil
+        avPlayer.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+        nowPlaying.update()
+    }
+
+    /// 跳回最新的地方；暫停中也順便開始播。
+    func goLive() {
+        guard isLive, !isLoading, segmentPlayer == nil else { return }
+        liveWindow = currentLiveWindow() ?? liveWindow
+        if let end = liveWindow?.upperBound {
+            liveTime = end
+            liveLastTick = nil
+            avPlayer.seek(to: CMTime(seconds: end, preferredTimescale: 600))
+        }
+        if !isPlaying {
+            enginePlay()
+            isPlaying = true
+            history?.resumed(at: position)
+        }
+        nowPlaying.update()
     }
 
     func seek(to seconds: Double) {
@@ -519,6 +585,14 @@ final class Player {
 
     private func tick(_ seconds: Double) {
         guard current != nil, !isLoading, seconds.isFinite else { return }
+        if isLive {
+            if isPlaying, let last = liveLastTick, seconds > last, seconds - last < 2 { position += seconds - last }
+            liveLastTick = seconds
+            liveTime = seconds
+            liveWindow = currentLiveWindow()
+            history?.tick(at: seconds, playing: isPlaying)
+            return
+        }
         position = seconds
         history?.tick(at: seconds, playing: isPlaying)
         if isPlaying, !isLive, let seg = segments.first(where: { seconds >= $0.start && seconds < $0.end - 0.5 && !skipped.contains($0) }) {

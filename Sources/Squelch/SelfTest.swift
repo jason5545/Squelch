@@ -557,6 +557,31 @@ enum SelfTest {
             let advanced = player.currentTime().seconds - t0
             check(item.status == .readyToPlay && advanced > 1, "live plays: ready in \(String(format: "%.1f", Date().timeIntervalSince(started) - 4))s, advanced \(String(format: "%.1f", advanced))s")
             player.pause()
+
+            // 直播一開播就在最新的地方；能回放的（這個頻道有約 1 小時窗口）可以往回拉、再一鍵回到最新。換集再回來也是從最新開始。
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("squelch-live-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let live = Player(library: Library(directory: dir))
+            live.silent = true
+            for round in 1...2 {
+                live.play(ep)
+                await wait(25) { live.isPlaying && live.liveWindow != nil && live.liveTime > 0 }
+                check(live.isLive && live.isPlaying && live.isAtLiveEdge,
+                      "live starts at the newest (play \(round)): behind \(fixed(live.liveBehind))s")
+            }
+            let window = live.liveWindow.map { $0.upperBound - $0.lowerBound } ?? 0
+            check(live.canSeekLive, "live with DVR can seek: window \(Format.time(window))")
+            live.skip(-60)
+            await wait(10) { live.liveBehind > 50 && live.isPlaying && !live.isBuffering }
+            try? await Task.sleep(for: .seconds(2))
+            check(live.liveBehind > 50 && live.liveBehind < 90 && !live.isAtLiveEdge,
+                  "live seek back 60s: behind \(fixed(live.liveBehind))s")
+            live.pause()
+            live.goLive()
+            await wait(10) { live.isPlaying && live.isAtLiveEdge }
+            try? await Task.sleep(for: .seconds(2))
+            check(live.isPlaying && live.isAtLiveEdge, "go live jumps to the newest and plays: behind \(fixed(live.liveBehind))s")
+            live.pause()
         } catch {
             check(false, "live: \(error.localizedDescription)")
         }

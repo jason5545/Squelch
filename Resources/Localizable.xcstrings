@@ -35,6 +35,34 @@
         }
       }
     },
+    "%@ · 直播中": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Live"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · ライブ配信中"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · 直播中"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · 直播中"
+          }
+        }
+      }
+    },
     "%lld 部 · %@ 更新，打開這裡或按重新整理才會再抓": {
       "localizations": {
         "en": {
@@ -1054,6 +1082,34 @@
         }
       }
     },
+    "回到直播": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go Live"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブに戻る"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回到直播"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回到直播"
+          }
+        }
+      }
+    },
     "在 Squelch 聽過的影片會出現在這裡。登入後會顯示 YouTube 的觀看記錄。": {
       "localizations": {
         "en": {
@@ -1414,34 +1470,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "已經是最新版"
-          }
-        }
-      }
-    },
-    "已聽 %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ listened"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ 再生済み"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已听 %@"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "已聽 %@"
           }
         }
       }
@@ -1834,6 +1862,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "抓不到觀看記錄"
+          }
+        }
+      }
+    },
+    "拖曳可以往回聽": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag to listen back"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ドラッグして巻き戻し"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖动可以往回听"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖曳可以往回聽"
           }
         }
       }
@@ -2966,6 +3022,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在直播"
+          }
+        }
+      }
+    },
+    "正在聽最新的": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listening live"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新の位置で再生中"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在听最新的"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在聽最新的"
           }
         }
       }
@@ -4170,6 +4254,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "超過 100% 要先下載音軌"
+          }
+        }
+      }
+    },
+    "跳回最新的地方": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jump back to live"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新の位置に戻る"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳回最新的地方"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳回最新的地方"
           }
         }
       }

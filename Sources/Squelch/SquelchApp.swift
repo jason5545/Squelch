@@ -167,7 +167,11 @@ struct MenuBarContent: View {
     var body: some View {
         if let ep = player.current {
             Text(ep.title)
-            Text("\(ep.channelTitle) · \(Format.time(player.position)) / \(Format.time(player.duration)) · \(Format.rate(player.rate))")
+            if player.isLive {
+                Text("\(ep.channelTitle) · 直播中")
+            } else {
+                Text("\(ep.channelTitle) · \(Format.time(player.position)) / \(Format.time(player.duration)) · \(Format.rate(player.rate))")
+            }
             Divider()
             Button(player.isPlaying ? "暫停" : "播放") { player.toggle() }
             Button("倒退 15 秒") { player.skip(-15) }
