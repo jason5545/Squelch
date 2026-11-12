@@ -143,6 +143,34 @@
         }
       }
     },
+    "%lld%%": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld%%"
+          }
+        }
+      }
+    },
     "@handle 或頻道網址": {
       "localizations": {
         "en": {
@@ -167,6 +195,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "@handle 或頻道網址"
+          }
+        }
+      }
+    },
+    "Codex · GPT-6 Luna · xhigh · 快速模式": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex · GPT-6 Luna · xhigh · fast mode"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex · GPT-6 Luna · xhigh · 高速モード"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex · GPT-6 Luna · xhigh · 快速模式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex · GPT-6 Luna · xhigh · 快速模式"
           }
         }
       }
@@ -802,6 +858,34 @@
         }
       }
     },
+    "刪除": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除"
+          }
+        }
+      }
+    },
     "剩 %@": {
       "localizations": {
         "en": {
@@ -1278,6 +1362,62 @@
         }
       }
     },
+    "字幕": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtitles"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕"
+          }
+        }
+      }
+    },
+    "字幕讀取失敗（HTTP %lld）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load subtitles (HTTP %lld)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕を読み込めませんでした（HTTP %lld）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕读取失败（HTTP %lld）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕讀取失敗（HTTP %lld）"
+          }
+        }
+      }
+    },
     "小聲一點": {
       "localizations": {
         "en": {
@@ -1302,6 +1442,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "小聲一點"
+          }
+        }
+      }
+    },
+    "已下載": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Downloaded"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ダウンロード済み"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已下载"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已下載"
           }
         }
       }
@@ -1806,6 +1974,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "找不到"
+          }
+        }
+      }
+    },
+    "找不到 codex": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "codex not found"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "codex が見つかりません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 codex"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 codex"
+          }
+        }
+      }
+    },
+    "找不到 codex，沒辦法翻譯": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "codex not found, can't translate"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "codex が見つからないため翻訳できません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 codex，无法翻译"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到 codex，沒辦法翻譯"
           }
         }
       }
@@ -2606,6 +2830,34 @@
         }
       }
     },
+    "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。直播沒有字幕。翻好的存在快取，重聽不用再翻。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uses YouTube's subtitles when there are any (uploaded ones first, then auto-generated) and translates them into Traditional Chinese (Taiwan) with the Codex on this Mac, signed in with your own Codex account. Chinese videos aren't translated, only converted to Traditional characters. Live streams have no subtitles. Translations are cached, so listening again doesn't translate again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YouTube の字幕があればそれを使い（アップロードされたものを優先、なければ自動字幕）、この Mac の Codex で繁体字中国語（台湾）に翻訳します。Codex はあなた自身のアカウントでログインしたものを使います。中国語の動画は翻訳せず、繁体字に変換するだけです。ライブ配信には字幕がありません。翻訳はキャッシュされるので、聴き直すときは再翻訳しません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 YouTube 字幕就用（人工上传的优先，其次是自动字幕），交给本机的 Codex 翻成繁体中文（台湾），用的是你自己的 Codex 登录。原文是中文的不翻，只转成繁体字。直播没有字幕。翻好的存在缓存，重听不用再翻。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻成正體中文，用的是你自己的 Codex 登入。原文是中文的不翻，只轉成正體字。直播沒有字幕。翻好的存在快取，重聽不用再翻。"
+          }
+        }
+      }
+    },
     "查不到 yt-dlp 的最新版本。": {
       "localizations": {
         "en": {
@@ -2714,6 +2966,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "標題"
+          }
+        }
+      }
+    },
+    "模型": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデル"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型"
+          }
+        }
+      }
+    },
+    "模型檔案大小不對": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model file sizes don't match"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルファイルのサイズが一致しません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型文件大小不对"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型檔案大小不對"
           }
         }
       }
@@ -2858,6 +3166,34 @@
         }
       }
     },
+    "正在抓字幕…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading subtitles…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕を読み込み中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在获取字幕…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在抓字幕…"
+          }
+        }
+      }
+    },
     "正在抓觀看記錄…": {
       "localizations": {
         "en": {
@@ -2998,6 +3334,34 @@
         }
       }
     },
+    "正在準備語音辨識模型 %lld%%": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing the speech recognition model %lld%%"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声認識モデルを準備中 %lld%%"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在准备语音识别模型 %lld%%"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在準備語音辨識模型 %lld%%"
+          }
+        }
+      }
+    },
     "正在直播": {
       "localizations": {
         "en": {
@@ -3022,6 +3386,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在直播"
+          }
+        }
+      }
+    },
+    "正在翻譯…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Translating…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻訳中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在翻译…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在翻譯…"
           }
         }
       }
@@ -3054,6 +3446,62 @@
         }
       }
     },
+    "正在辨識…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribing…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字起こし中…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在识别…"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在辨識…"
+          }
+        }
+      }
+    },
+    "沒有下載": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not downloaded"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未ダウンロード"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未下载"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有下載"
+          }
+        }
+      }
+    },
     "沒有在播": {
       "localizations": {
         "en": {
@@ -3078,6 +3526,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "沒有在播"
+          }
+        }
+      }
+    },
+    "沒有字幕時用本機語音辨識": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe on this Mac when there are no subtitles"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕がないときはこの Mac で文字起こしする"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有字幕时用本机语音识别"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "沒有字幕時用本機語音辨識"
           }
         }
       }
@@ -3330,6 +3806,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "狀態"
+          }
+        }
+      }
+    },
+    "用 Qwen3-ASR 1.7B 在這台 Mac 上辨識，不會上傳聲音。第一次打開要下載約 2.5 GB 的模型（Hugging Face）。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runs Qwen3-ASR 1.7B on this Mac; audio is never uploaded. The first time you turn it on, a 2.5 GB model is downloaded from Hugging Face."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Qwen3-ASR 1.7B をこの Mac 上で動かします。音声はアップロードしません。初めてオンにすると約 2.5 GB のモデルを Hugging Face からダウンロードします。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Qwen3-ASR 1.7B 在这台 Mac 上识别，不会上传声音。第一次打开要下载约 2.5 GB 的模型（Hugging Face）。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 Qwen3-ASR 1.7B 在這台 Mac 上辨識，不會上傳聲音。第一次打開要下載約 2.5 GB 的模型（Hugging Face）。"
           }
         }
       }
@@ -3614,6 +4118,34 @@
         }
       }
     },
+    "直播沒有字幕": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No subtitles for live streams"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブ配信には字幕がありません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直播没有字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直播沒有字幕"
+          }
+        }
+      }
+    },
     "直播沒辦法放大，最大就是 100%": {
       "localizations": {
         "en": {
@@ -3862,6 +4394,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "繼續聽"
+          }
+        }
+      }
+    },
+    "翻譯": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Translation"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻訳"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻译"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻譯"
+          }
+        }
+      }
+    },
+    "翻譯失敗：%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Translation failed: %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻訳に失敗しました：%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻译失败：%@"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻譯失敗：%@"
+          }
+        }
+      }
+    },
+    "翻譯結果看不懂": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't read the translation"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻訳結果を読み取れませんでした"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻译结果无法解析"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "翻譯結果看不懂"
           }
         }
       }
@@ -4454,6 +5070,34 @@
         }
       }
     },
+    "這部沒有字幕": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This video has no subtitles"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この動画には字幕がありません"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这部没有字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這部沒有字幕"
+          }
+        }
+      }
+    },
     "還沒有勾選要檢查直播的頻道": {
       "localizations": {
         "en": {
@@ -4590,6 +5234,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "重新整理"
+          }
+        }
+      }
+    },
+    "重試": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再試行"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重試"
+          }
+        }
+      }
+    },
+    "關掉字幕": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide subtitles"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕をオフ"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關掉字幕"
           }
         }
       }
@@ -4786,6 +5486,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "頻道設定"
+          }
+        }
+      }
+    },
+    "顯示字幕": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show subtitles"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕を表示"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示字幕"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示字幕"
+          }
+        }
+      }
+    },
+    "顯示字幕（翻成正體中文）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show subtitles (translated into Traditional Chinese)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕を表示（繁体字中国語に翻訳）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示字幕（翻成繁体中文）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顯示字幕（翻成正體中文）"
           }
         }
       }

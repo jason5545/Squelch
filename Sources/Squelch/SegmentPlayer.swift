@@ -128,7 +128,7 @@ nonisolated enum ADTS {
 
 /// ADTS AAC → 交錯的 Float32 PCM。分段要照順序餵：解碼器的狀態跨分段連續，分段邊界才不會有斷點。
 /// 跳轉後換一個新的。
-final class SegmentDecoder {
+nonisolated final class SegmentDecoder {
     let format: ADTS.Format
     private let input: AVAudioFormat
     private let output: AVAudioFormat

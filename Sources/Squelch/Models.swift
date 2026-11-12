@@ -45,6 +45,8 @@ nonisolated struct ResolvedStream: Sendable {
     var channelID: String?
     var expires: Date
     var isLive = false
+    /// 字幕要用哪一軌（`Captions.choose`）。本機快取檔沒有這個資訊，字幕那邊會另外查。
+    var captions: CaptionTrack?
 
     var isFresh: Bool {
         isLocal ? FileManager.default.fileExists(atPath: url.path) : expires.timeIntervalSinceNow > 15 * 60

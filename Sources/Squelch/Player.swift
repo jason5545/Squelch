@@ -53,6 +53,8 @@ final class Player {
     @ObservationIgnored let library: Library
     /// 登入時回報播放紀錄；沒登入時 `WatchHistory` 自己什麼都不做。
     @ObservationIgnored var history: WatchHistory?
+    /// 字幕：開播時告訴它這一集的音軌。
+    @ObservationIgnored weak var subtitles: Subtitles?
     @ObservationIgnored private var historyStarted = false
     @ObservationIgnored let avPlayer = AVPlayer()
     @ObservationIgnored private(set) var nowPlaying = NowPlaying()
@@ -287,6 +289,7 @@ final class Player {
 
     private func start(_ stream: ResolvedStream, at seconds: Double) {
         teardownItem()
+        if let ep = current { subtitles?.attach(ep, stream) }
         liveLastTick = nil
         liveWindow = nil
         isLocalPlayback = stream.isLocal

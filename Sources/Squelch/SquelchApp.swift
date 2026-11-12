@@ -20,6 +20,20 @@ enum Main {
             NSApplication.shared.setActivationPolicy(.accessory)
             NSApplication.shared.run()
         }
+        if CommandLine.arguments.contains("--subtitle-flow") {
+            Task { @MainActor in
+                let ok = await SubtitleFlowCheck.run(CommandLine.arguments)
+                exit(ok ? 0 : 1)
+            }
+            dispatchMain()
+        }
+        if CommandLine.arguments.contains("--subtitle-check") {
+            Task { @MainActor in
+                let ok = await SubtitleCheck.run(CommandLine.arguments)
+                exit(ok ? 0 : 1)
+            }
+            dispatchMain()
+        }
         if CommandLine.arguments.contains("--selftest") {
             Task { @MainActor in
                 let ok = await SelfTest.run()
@@ -84,6 +98,7 @@ struct SquelchApp: App {
     @State private var library: Library
     @State private var player: Player
     @State private var account: Account
+    @State private var subtitles: Subtitles
 
     init() {
         let account = Account()
@@ -91,6 +106,10 @@ struct SquelchApp: App {
         library.account = account
         let player = Player(library: library)
         player.history = WatchHistory(account: account)
+        let subtitles = Subtitles()
+        subtitles.player = player
+        player.subtitles = subtitles
+        _subtitles = State(initialValue: subtitles)
         _account = State(initialValue: account)
         _library = State(initialValue: library)
         _player = State(initialValue: player)
@@ -108,6 +127,7 @@ struct SquelchApp: App {
                 .environment(library)
                 .environment(player)
                 .environment(account)
+                .environment(subtitles)
                 .frame(minWidth: 900, minHeight: 500)
         }
         .commands { PlaybackCommands(player: player) }
@@ -124,6 +144,7 @@ struct SquelchApp: App {
             SettingsView()
                 .environment(library)
                 .environment(account)
+                .environment(subtitles)
         }
     }
 }

@@ -1,0 +1,12 @@
+SquelchASR
+
+The Qwen3-ASR model code in Sources/SquelchASR (Qwen3*.swift, MetalBudget.swift)
+is adapted from speech-swift (formerly ivan-digital/qwen3-asr-swift):
+
+  https://github.com/soniqo/speech-swift
+  Licensed under the Apache License, Version 2.0
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Files carry an "Adapted from" header naming the upstream file. Changes were made
+for use in Voco, AISubtitle and Squelch (adapter loading, warmup, chunking at
+silence, segmenter). Distributed under the Apache License, Version 2.0.

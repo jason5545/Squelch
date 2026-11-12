@@ -23,6 +23,7 @@
 - 觀看記錄：登入時是 YouTube 的觀看記錄（手機上看的也在），沒登入是 Squelch 自己的播放記錄
 - 貼影片網址直接播（直播回放、沒訂閱的頻道）
 - 正在直播的會標「直播中」排在最上面，可以直接聽。「直播中」清單檢查你勾選的頻道（設定或頻道右鍵），每 10 分鐘自動查一次：打開頻道的 `/live` 網頁看播放器資料的 `isLive`，一個頻道一個請求，不用 yt-dlp、不帶帳號（頻道 RSS 在 2026/11 已經 404）。`/live` 只給頻道主要的那一場，同時開好幾場只會抓到一場
+- 字幕（選用，預設關）：播放列上方顯示正體中文字幕，下面小字是原文。有 YouTube 字幕就用（人工上傳的優先，其次是自動字幕），交給本機的 Codex 翻譯；原文是中文的只轉正體字。沒有字幕的影片可以再打開「本機語音辨識」，用 Qwen3-ASR 在這台 Mac 上辨識。見「字幕」
 - 介面有正體中文、English、日本語、简体中文，跟著系統語言；其他語言顯示英文
 - 登入 YouTube（選用）：多一個「訂閱動態」，播放紀錄和進度會回報給 YouTube，網頁版和手機可以接著看
 
@@ -92,6 +93,35 @@ AVPlayer 的音量最大 100%，要更大聲只能在音訊路徑上加增益（
 - 不帶 ffmpeg：只有下載備援用得到，改用 AVFoundation 重新封裝（見「怎麼播的」）。
 - 自動更新：YouTube 一改版，舊的 yt-dlp 就抓不到。Squelch 每天到 GitHub 查一次 yt-dlp 的最新版（yt-dlp 失敗時最多每小時查一次），比使用中的新就下載 `yt-dlp_macos.zip`、核對 `SHA2-256SUMS`、實際跑一次 `--version`，都對了才放到 `~/Library/Application Support/Squelch/yt-dlp/`。App 本體不動，簽章不會壞；內建的和下載的兩份，用版本較新的那份。設定裡可以手動檢查，也可以指定自己的 yt-dlp。
 
+## 字幕
+
+播放列右邊的對話框按鈕開關，設定裡也有。預設關。
+
+1. 挑字幕軌：開播時 `yt-dlp -j` 本來就會列出字幕（`subtitles`、`automatic_captions`），不用多一次請求。順序是人工上傳的正體中文（直接顯示）→ 原文的人工字幕 → 原文的自動字幕（`<語言>-orig`）。YouTube 自動翻譯的軌（`automatic_captions` 裡的 `zh-Hant` 那些）不用。本機快取檔播放時沒有這份資料，另外跑一次 `yt-dlp -j --skip-download`。
+2. 抓字幕：json3 格式，整份一次抓下來（網址約 6 小時過期）。自動字幕是逐字滾動的，每個字有自己的時間，在停頓超過 0.8 秒、句尾、超過 7 秒或太長的地方斷成一句。五小時的直播回放約 4,200 句，0.8 秒抓完（2026/11/12 實測）。
+3. 翻譯：本機的 `codex app-server --stdio`（JSON-RPC），用你自己的 Codex 登入，不需要 API key。模型固定 GPT-6 Luna、推理 xhigh、快速模式（`serviceTier: priority`，Codex 的回應會確認）。每一批開一個 ephemeral thread，前面 4 句和後面 2 句當參考一起送，回傳用 JSON schema 限定格式。thread 的工作目錄是空的暫存資料夾、沙盒唯讀、不准連網。一開始一批 6 句，翻到播放位置前面 20 秒以後一批 16 句，同時最多兩批，只翻播放位置往後 5 分鐘內的。實測（2026/11/12）：一批 6 句 7～12 秒；開播後約 15 秒出現第一句中文（含 3 秒解析網址），播到 0:42 時已經翻到 2:30；跳到 10:00 後約 21 秒跟上，還沒翻好的那幾句先用灰字顯示原文。
+4. 原文是中文：不送翻譯，用系統的 `Hans-Hant` 轉成正體字（只轉字、不轉用詞）。
+5. 快取：`~/Library/Caches/Squelch/subtitles/<影片 ID>.json`，翻好的句子都在裡面，重聽不用再翻。
+6. 直播沒有字幕：直播交給 AVPlayer 播，拿不到字幕也拿不到音訊。
+
+### 本機語音辨識（沒有字幕時）
+
+設定裡另外打開，預設關。打開才準備模型：[mlx-community/Qwen3-ASR-1.7B-8bit](https://huggingface.co/mlx-community/Qwen3-ASR-1.7B-8bit)（約 2.5 GB，版本釘死在 `a8379a2`，下載後核對檔案大小），放在 `~/Library/Application Support/Squelch/Models/`。同一台 Mac 的 Voco 已經下載過同一個模型的話，直接複製過來（APFS 上是 clone，不多佔空間）。
+
+- 不跟播放共用音訊：自己照同一份 HLS 播放清單抓分段（每段約 5 秒、80 KB）、解碼、轉成 16 kHz 單聲道；下載備援的本機檔用 `AVAssetReader`。所以可以跑在播放前面（最多 3 分鐘），也不受倍速影響。
+- 切段跟 AISubtitle 一樣：優先在安靜的地方切，最長 5.6 秒，要硬切時在最後 1.5 秒裡找最安靜的位置。
+- 辨識結果照樣交給 Codex 翻；偵測到是中文就只轉正體字。
+- 實測（2026/11/12，這台開發用的 Mac）：載入模型 3.2 秒，40 秒的聲音 5.5 秒辨識完。
+- 語音辨識的程式碼在 `Packages/SquelchASR`（MLX，獨立成 Swift 5 模式的本機套件），改寫自 [soniqo/speech-swift](https://github.com/soniqo/speech-swift)（Apache-2.0，授權見該資料夾的 `NOTICE`）。App 因此變大，Debug 建置從約 126 MB 變成 177 MB（多的主要是 MLX）。
+
+檢查字幕（會花 Codex 額度，所以不在自我測試裡）：
+
+```sh
+Squelch.app/Contents/MacOS/Squelch --subtitle-check <影片 ID>              # 挑軌、抓字幕、翻一批
+Squelch.app/Contents/MacOS/Squelch --subtitle-check <影片 ID> --speech 40  # 改用本機語音辨識前 40 秒
+Squelch.app/Contents/MacOS/Squelch --subtitle-flow <影片 ID>               # 不出聲地播，跑整個流程：翻譯排程、跳轉、快取
+```
+
 ## 登入
 
 做法參考 [Kaset](https://github.com/sozercan/kaset)：App 內開 Google 登入頁，cookie 存在 Squelch 自己的 WebKit 資料區，跟瀏覽器分開。登入頁會藏掉 passkey（內嵌網頁的 passkey 一定失敗，見 Kaset ADR-0033），Google 會改走密碼。
@@ -110,3 +140,5 @@ AVPlayer 的音量最大 100%，要更大聲只能在音訊路徑上加增益（
 - `~/Library/Application Support/Squelch/library.json`：頻道、影片、進度、待播清單。第一次打開沒有任何頻道，從右上角的 + 加入。
 - `~/Library/Application Support/Squelch/cookies.txt`：登入後給 yt-dlp 的 cookie（權限 0600），登出就刪。
 - `~/Library/Application Support/Squelch/yt-dlp/`：自動更新下載的 yt-dlp，刪掉就回到內建的那份。
+- `~/Library/Application Support/Squelch/Models/`：本機語音辨識的模型（約 2.5 GB），設定裡可以刪。
+- `~/Library/Caches/Squelch/subtitles/`：抓下來和翻好的字幕。

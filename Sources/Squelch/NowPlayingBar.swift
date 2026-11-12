@@ -198,6 +198,7 @@ private struct BarExtras: View {
                 .help("播放速度（⌘[ ⌘]）")
             }
             BarVolume()
+            SubtitleToggle()
             Button { showPanel.toggle() } label: {
                 Image(systemName: "sidebar.trailing")
                     .font(.system(size: 15, weight: .semibold))

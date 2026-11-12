@@ -156,6 +156,7 @@ Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次�
                 Text("Squelch 內建 yt-dlp 和它需要的 deno，不用另外安裝。YouTube 一改版舊的 yt-dlp 就抓不到，所以每天會到 GitHub 查一次，有新版就自動下載到「~/Library/Application Support/Squelch/yt-dlp」。")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            SubtitleSettings()
             Section("SponsorBlock") {
                 Toggle("跳過贊助片段", isOn: $sponsor)
                 Toggle("跳過自我宣傳（自家產品、周邊）", isOn: $selfpromo)

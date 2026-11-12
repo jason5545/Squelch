@@ -10,7 +10,7 @@ import MediaPlayer
 enum SelfTest {
     private static var failures = 0
 
-    private static func check(_ ok: Bool, _ label: String) {
+    static func check(_ ok: Bool, _ label: String) {
         print((ok ? "PASS  " : "FAIL  ") + label)
         if !ok { failures += 1 }
     }
@@ -58,6 +58,7 @@ enum SelfTest {
         unity.withUnsafeMutableBufferPointer { Boost.process($0.baseAddress!, count: $0.count, gain: 1) }
         check(unity == [0.3, -0.9], "boost at 100% leaves audio untouched")
 
+        subtitleUnits()
         await tools()
         print("yt-dlp: \(YTDLP.binaryPath() ?? "missing") \(await YTDLP.version() ?? "")")
 
@@ -83,6 +84,7 @@ enum SelfTest {
                 let stream = try await YTDLP.resolve(videoID: ep.id)
                 check(!stream.isLocal, "resolve HLS audio (\(String(format: "%.1f", Date().timeIntervalSince(started)))s)")
                 await decoding(stream)
+                await subtitles(stream, videoID: ep.id)
                 await segments(stream, duration: ep.duration ?? 0)
                 await playback(stream, duration: ep.duration ?? 0, label: "HLS")
                 let dlStart = Date()

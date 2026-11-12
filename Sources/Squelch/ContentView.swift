@@ -40,7 +40,10 @@ struct ContentView: View {
         }
         // 播放列橫跨整個視窗底部，播放鍵、進度、音量都在這裡；右側面板放封面和接下來。
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            NowPlayingBar(showPanel: $showPanel)
+            VStack(spacing: 0) {
+                SubtitleStrip()
+                NowPlayingBar(showPanel: $showPanel)
+            }
         }
         .tint(Theme.amber)
         .preferredColorScheme(.dark)

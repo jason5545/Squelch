@@ -27,10 +27,16 @@ enum Snapshot {
         let root: AnyView = panelOnly
             ? AnyView(PlayerPanel().background(Color(nsColor: .windowBackgroundColor)))
             : AnyView(ContentView(initialSelection: item))
+        // `--subtitles`：播放列上方顯示一句字幕。
+        let subtitles = Subtitles(preview: [Cue(start: 0, end: .infinity,
+                                                text: "So the trick is that the audio is decoded before it's played.",
+                                                translation: "重點是聲音在播出來之前就已經解碼好了。")],
+                                  enabled: CommandLine.arguments.contains("--subtitles"))
         let view = root
             .environment(library)
             .environment(player)
             .environment(Account(checkWebKit: false))
+            .environment(subtitles)
             .frame(width: size.width, height: size.height)
         let host = NSHostingView(rootView: view)
         // 把工具列接到視窗上，截圖後才能列出工具列裡有什麼（工具列畫在視窗框上，PNG 裡看不到）。
