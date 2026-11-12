@@ -172,9 +172,11 @@ private struct LiveBadge: View {
     }
 }
 
-/// 播放列右邊：倍速、音量、面板開關。
+/// 播放列右邊：倍速、音量、字幕、迷你模式、面板開關。
 private struct BarExtras: View {
     @Environment(Player.self) private var player
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @Binding var showPanel: Bool
 
     var body: some View {
@@ -199,6 +201,16 @@ private struct BarExtras: View {
             }
             BarVolume()
             SubtitleToggle()
+            Button {
+                openWindow(id: "mini")
+                dismissWindow(id: "main")
+            } label: {
+                Image(systemName: "pip.enter")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(GlyphButtonStyle())
+            .help("迷你模式（⌘⇧M）")
             Button { showPanel.toggle() } label: {
                 Image(systemName: "sidebar.trailing")
                     .font(.system(size: 15, weight: .semibold))

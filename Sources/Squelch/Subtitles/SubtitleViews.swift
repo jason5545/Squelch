@@ -18,7 +18,7 @@ struct SubtitleStrip: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
-                } else if let note = statusNote {
+                } else if let note = Self.note(subtitles, position: player.position) {
                     Text(note)
                         .font(.callout)
                         .foregroundStyle(.secondary)
@@ -39,8 +39,8 @@ struct SubtitleStrip: View {
         }
     }
 
-    /// 沒有字幕可以顯示時，說明為什麼。
-    private var statusNote: String? {
+    /// 沒有字幕可以顯示時，說明為什麼。迷你視窗也用。
+    static func note(_ subtitles: Subtitles, position: Double) -> String? {
         if let error = subtitles.translationError { return error }
         switch subtitles.status {
         case .idle: return nil
@@ -53,8 +53,8 @@ struct SubtitleStrip: View {
             if case .failed(let why) = subtitles.model.state { return why }
             return subtitles.cues.isEmpty ? String(localized: "正在辨識…") : nil
         case .captions:
-            return subtitles.needsTranslation && subtitles.cues.contains(where: { $0.start >= player.position && $0.translation == nil })
-                && !subtitles.cues.contains(where: { $0.translation != nil }) ? String(localized: "正在翻譯…") : nil
+            return subtitles.needsTranslation && !subtitles.cues.contains(where: { $0.translation != nil })
+                ? String(localized: "正在翻譯…") : nil
         }
     }
 }

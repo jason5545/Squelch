@@ -132,6 +132,23 @@ struct SquelchApp: App {
         }
         .commands { PlaybackCommands(player: player) }
 
+        // 桌面迷你模式：無邊框、浮在最上層，拖背景移動。位置由系統記住。
+        Window("迷你播放器", id: "mini") {
+            MiniPlayer()
+                .environment(player)
+                .environment(subtitles)
+        }
+        .windowStyle(.plain)
+        .windowLevel(.floating)
+        .windowResizability(.contentSize)
+        .windowBackgroundDragBehavior(.enabled)
+        .defaultWindowPlacement { content, context in
+            // 第一次打開放在螢幕右上角。
+            let size = content.sizeThatFits(.unspecified)
+            let screen = context.defaultDisplay.visibleRect
+            return WindowPlacement(CGPoint(x: screen.maxX - size.width - 24, y: screen.minY + 24), size: size)
+        }
+
         MenuBarExtra {
             MenuBarContent()
                 .environment(library)
@@ -151,9 +168,14 @@ struct SquelchApp: App {
 
 struct PlaybackCommands: Commands {
     let player: Player
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some Commands {
         CommandMenu("播放") {
+            Button("迷你模式") { MiniMode.toggle(openWindow: openWindow, dismissWindow: dismissWindow) }
+                .keyboardShortcut("m", modifiers: [.command, .shift])
+            Divider()
             Button(player.isPlaying ? "暫停" : "播放") { player.toggle() }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(player.current == nil)
@@ -184,6 +206,7 @@ struct PlaybackCommands: Commands {
 struct MenuBarContent: View {
     @Environment(Player.self) private var player
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         if let ep = player.current {
@@ -207,7 +230,30 @@ struct MenuBarContent: View {
             openWindow(id: "main")
             NSApp.activate()
         }
+        Button("迷你模式") {
+            openWindow(id: "mini")
+            dismissWindow(id: "main")
+        }
         Button("結束 Squelch") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+}
+
+/// 完整視窗和迷你視窗二選一：打開一個就收起另一個。
+@MainActor
+enum MiniMode {
+    static var isActive: Bool {
+        NSApp.windows.contains { $0.identifier?.rawValue.hasPrefix("mini") == true && $0.isVisible }
+    }
+
+    static func toggle(openWindow: OpenWindowAction, dismissWindow: DismissWindowAction) {
+        if isActive {
+            openWindow(id: "main")
+            NSApp.activate()
+            dismissWindow(id: "mini")
+        } else {
+            openWindow(id: "mini")
+            dismissWindow(id: "main")
+        }
     }
 }

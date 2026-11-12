@@ -23,9 +23,13 @@ enum Snapshot {
         // `--width 900`：看窄視窗的排版（主視窗最小 900 寬）。
         let width = CommandLine.arguments.firstIndex(of: "--width").flatMap {
             $0 + 1 < CommandLine.arguments.count ? Double(CommandLine.arguments[$0 + 1]) : nil } ?? 1280
-        let size = panelOnly ? NSSize(width: 320, height: 820) : NSSize(width: width, height: 800)
+        // `--mini`：桌面迷你模式（放在深色底上看圓角和邊框）。
+        let mini = CommandLine.arguments.contains("--mini")
+        let size = panelOnly ? NSSize(width: 320, height: 820)
+            : mini ? NSSize(width: MiniPlayer.width + 80, height: 260) : NSSize(width: width, height: 800)
         let root: AnyView = panelOnly
             ? AnyView(PlayerPanel().background(Color(nsColor: .windowBackgroundColor)))
+            : mini ? AnyView(ZStack { Color(white: 0.32); MiniPlayer().fixedSize() })
             : AnyView(ContentView(initialSelection: item))
         // `--subtitles`：播放列上方顯示一句字幕。
         let subtitles = Subtitles(preview: [Cue(start: 0, end: .infinity,
