@@ -135,6 +135,7 @@ struct SquelchApp: App {
         // 桌面迷你模式：無邊框、浮在最上層，拖背景移動。位置由系統記住。
         Window("迷你播放器", id: "mini") {
             MiniPlayer()
+                .environment(library)
                 .environment(player)
                 .environment(subtitles)
         }

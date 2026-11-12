@@ -51,6 +51,8 @@ actor CodexTranslator {
 
     static var isInstalled: Bool { executable() != nil }
 
+    var isRunning: Bool { process?.isRunning == true }
+
     // MARK: 翻譯
 
     func translate(_ batch: Batch) async throws -> [Int: String] {

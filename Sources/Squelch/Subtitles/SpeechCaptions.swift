@@ -142,6 +142,10 @@ actor SpeechTranscriber {
         await recognizer.unload()
     }
 
+    var isLoaded: Bool {
+        get async { await recognizer.isLoaded }
+    }
+
     /// 從 `start` 秒開始往後辨識。`horizon()` 回傳現在可以做到哪裡（播放位置往後幾分鐘），超過就等。
     /// 每辨識完一段呼叫 `emit`（這段的字幕，和已經處理到哪裡）。
     func run(_ stream: ResolvedStream, from start: Double,

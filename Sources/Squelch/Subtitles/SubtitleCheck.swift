@@ -152,7 +152,7 @@ enum SubtitleFlowCheck {
 
         let started = Date()
         player.play(ep)
-        if stream.isLive { return await live(player, subtitles, ep, started, cacheFile) }
+        if stream.isLive { return await live(player, subtitles, ep, stream, started, cacheFile) }
         // 第一句有中文的字幕出現在畫面上（播放位置那句）。
         var firstShown: Double?
         while Date().timeIntervalSince(started) < 90 {
@@ -201,7 +201,7 @@ enum SubtitleFlowCheck {
     }
 
     /// 直播：沒有字幕，靠本機語音辨識。量字幕出來的速度，和字幕比播放位置早或晚多少。
-    private static func live(_ player: Player, _ subtitles: Subtitles, _ ep: Episode, _ started: Date, _ cacheFile: URL) async -> Bool {
+    private static func live(_ player: Player, _ subtitles: Subtitles, _ ep: Episode, _ stream: ResolvedStream, _ started: Date, _ cacheFile: URL) async -> Bool {
         var ok = true
         func check(_ pass: Bool, _ label: String) {
             print((pass ? "PASS  " : "FAIL  ") + label)
@@ -237,6 +237,47 @@ enum SubtitleFlowCheck {
         let newest = subtitles.cues.last.map { $0.end - clock } ?? -999
         print("info  60s: line on screen \(withLine)s, translated \(translated)s; newest cue ends \(String(format: "%+.0f", newest))s from playback; \(subtitles.cues.count) cues")
         check(translated >= 20, "live: translated lines shown for \(translated) of 60 seconds")
+
+        // 閒置釋放：門檻縮短成幾秒，暫停後模型和 codex 要被釋放，再播時自動接回來。
+        var state = await subtitles.resourceState()
+        check(state.speech && state.codex, "idle: while playing, model loaded \(state.speech), codex running \(state.codex)")
+        Subtitles.speechIdle = 3
+        Subtitles.codexIdle = 6
+        player.pause()
+        // 暫停時可能還有一批翻譯在路上，回來之後才開始算閒置，所以最多等 40 秒。
+        let pausedAt = Date()
+        repeat {
+            try? await Task.sleep(for: .seconds(1))
+            state = await subtitles.resourceState()
+        } while (state.speech || state.codex) && Date().timeIntervalSince(pausedAt) < 40
+        check(!state.speech && !state.codex, "idle: paused with short limits (3s model, 6s codex), released after \(String(format: "%.0f", Date().timeIntervalSince(pausedAt)))s: model unloaded \(!state.speech), codex stopped \(!state.codex)")
+        let before = subtitles.cues.count
+        player.play(ep)
+        var resumed = false
+        let resumeStart = Date()
+        while Date().timeIntervalSince(resumeStart) < 60 {
+            try? await Task.sleep(for: .seconds(1))
+            if subtitles.cues.count > before, let cue = subtitles.cue(at: player.subtitleClock), cue.translation != nil { resumed = true; break }
+        }
+        state = await subtitles.resourceState()
+        check(resumed && state.speech, "idle: playing again reloads the model and subtitles continue after \(String(format: "%.0f", Date().timeIntervalSince(resumeStart)))s")
+        Subtitles.speechIdle = 300
+        Subtitles.codexIdle = 600
+
+        // 換到有字幕的影片：用不到語音辨識，模型要卸載。
+        if let captioned = try? await YTDLP.resolve(videoID: "lz4crXJ4Uu8") {
+            let other = Episode(id: "lz4crXJ4Uu8", title: captioned.title, channelID: "", channelTitle: captioned.channelTitle,
+                                duration: captioned.duration, published: Date())
+            subtitles.attach(other, captioned)
+            let switchedAt = Date()
+            repeat {
+                try? await Task.sleep(for: .seconds(1))
+                state = await subtitles.resourceState()
+            } while state.speech && Date().timeIntervalSince(switchedAt) < 20
+            check(!state.speech && subtitles.status == .captions(language: "en", auto: false),
+                  "idle: switching to a video with captions unloads the model (status \(subtitles.status))")
+            subtitles.attach(ep, stream)
+        }
         player.pause()
         try? await Task.sleep(for: .seconds(3))
         check(FileManager.default.fileExists(atPath: cacheFile.path), "live: cache saved")

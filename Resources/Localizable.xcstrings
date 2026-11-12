@@ -1166,34 +1166,6 @@
         }
       }
     },
-    "回到完整視窗": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Back to full window"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "フルウインドウに戻る"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "回到完整窗口"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "回到完整視窗"
-          }
-        }
-      }
-    },
     "回到完整視窗（⌘⇧M）": {
       "localizations": {
         "en": {

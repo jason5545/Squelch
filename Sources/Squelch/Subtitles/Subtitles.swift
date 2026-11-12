@@ -5,6 +5,9 @@ import Observation
 /// 直播沒有字幕可抓：模型已經在這台 Mac 上就直接聽寫，不然要使用者按一下才下載模型。直播的時間軸是實際時間（UNIX 秒）。
 ///
 /// 翻譯和辨識都跑在播放位置前面：翻譯先翻接下來 5 分鐘內的句子，一次最多兩批；辨識最多做到播放位置後 3 分鐘。
+/// 用不到就釋放：關掉字幕時 codex app-server 和語音模型都停掉；開著的時候，這一集用不到語音辨識（有字幕）
+/// 或暫停超過 5 分鐘就卸載模型（約 2.3 GB），再播時自動載回來（約 3 秒）；10 分鐘沒有翻譯就停掉 codex app-server，
+/// 下一批翻譯時自動再開。
 /// 翻成哪種語言預設跟著介面語言（正體中文、简体中文、English、日本語），設定裡可以改。
 /// 結果存在 `~/Library/Caches/Squelch/subtitles/<影片 ID>.<目標語言>.json`，重聽不用再翻。
 @MainActor @Observable
@@ -26,10 +29,8 @@ final class Subtitles {
             } else {
                 stopAll()
                 // 不用字幕就不要讓 codex app-server 和 2.5 GB 的模型一直留著。
-                Task {
-                    await translator.stop()
-                    await speech.unload()
-                }
+                stopCodex()
+                unloadSpeech()
             }
         }
     }
@@ -42,7 +43,7 @@ final class Subtitles {
                 if enabled, case .unavailable = status { reattach() }
             } else {
                 stopSpeech()
-                Task { await speech.unload() }
+                unloadSpeech()
             }
         }
     }
@@ -85,6 +86,18 @@ final class Subtitles {
     @ObservationIgnored private var inFlight: Set<Double> = []
     @ObservationIgnored private var batches = 0
     @ObservationIgnored private var retryAfter = Date.distantPast
+    // 閒置釋放（見最上面的說明）。
+    /// 檢查模式會縮短，正式使用不改。
+    static var speechIdle: TimeInterval = 5 * 60
+    static var codexIdle: TimeInterval = 10 * 60
+    @ObservationIgnored private var speechLoaded = false
+    /// 卸載、載入語音模型排成一條，不會載入到一半又被前一個卸載蓋掉。
+    @ObservationIgnored private var speechOp: Task<Void, Never>?
+    /// 暫停太久被停掉的語音辨識，再播時接回來。
+    @ObservationIgnored private var speechSuspended = false
+    @ObservationIgnored private var lastPlaying = Date()
+    @ObservationIgnored private var codexRunning = false
+    @ObservationIgnored private var lastTranslation = Date.distantPast
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     init() {
@@ -128,6 +141,7 @@ final class Subtitles {
         needsTranslation = false
         translationError = nil
         retryAfter = .distantPast
+        speechSuspended = false
         heard = []
     }
 
@@ -192,6 +206,7 @@ final class Subtitles {
                         cues = found
                         needsTranslation = track.handling == .translate
                         status = .captions(language: track.language, auto: track.isAuto)
+                        unloadSpeech()   // 有字幕就用不到語音模型
                         save()
                         startTranslating()
                         return
@@ -232,6 +247,7 @@ final class Subtitles {
         translateTask = Task {
             while !Task.isCancelled {
                 scheduleBatch()
+                releaseIdle()
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -260,8 +276,11 @@ final class Subtitles {
                                           before: Array(before), after: Array(after))
         starts.forEach { inFlight.insert($0) }
         batches += 1
+        codexRunning = true
+        lastTranslation = Date()
         Task {
             defer {
+                lastTranslation = Date()
                 batches -= 1
                 starts.forEach { inFlight.remove($0) }
             }
@@ -287,6 +306,50 @@ final class Subtitles {
         }
     }
 
+    // MARK: 閒置釋放
+
+    /// 每秒跟著翻譯排程跑一次。
+    private func releaseIdle() {
+        let playing = player?.isPlaying == true && player?.current?.id == episode?.id
+        if playing { lastPlaying = Date() }
+        // 語音辨識：暫停超過 5 分鐘就停掉、卸載模型；再播時接回來。
+        if speechTask != nil, !playing, Date().timeIntervalSince(lastPlaying) > Self.speechIdle {
+            stopSpeech()
+            speechSuspended = true
+            unloadSpeech()
+        } else if speechSuspended, playing, status == .speech {
+            speechSuspended = false
+            startSpeech()
+        } else if speechTask == nil, !speechSuspended {
+            unloadSpeech()   // 這一集用不到（有字幕、或辨識結束了）
+        }
+        // Codex：10 分鐘沒有翻譯就停掉，下一批會自己再開。
+        if codexRunning, batches == 0, Date().timeIntervalSince(lastTranslation) > Self.codexIdle {
+            stopCodex()
+        }
+    }
+
+    /// 檢查模式用：語音模型、codex app-server 現在有沒有載著。
+    func resourceState() async -> (speech: Bool, codex: Bool) {
+        await speechOp?.value
+        return (await speech.isLoaded, await translator.isRunning)
+    }
+
+    private func unloadSpeech() {
+        guard speechLoaded else { return }
+        speechLoaded = false
+        let previous = speechOp
+        speechOp = Task {
+            await previous?.value
+            await speech.unload()
+        }
+    }
+
+    private func stopCodex() {
+        codexRunning = false
+        Task { await translator.stop() }
+    }
+
     // MARK: 語音辨識
 
     private func startSpeech() {
@@ -300,7 +363,9 @@ final class Subtitles {
                 if Task.isCancelled { return }
             }
             do {
+                await speechOp?.value
                 try await speech.load(SpeechModel.directory)
+                speechLoaded = true
             } catch {
                 status = .unavailable(error.localizedDescription)
                 return
