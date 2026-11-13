@@ -18,15 +18,16 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             Sidebar(selection: $selection)
-                // 搜尋框放在側欄上方（像 Apple Music）。一定要掛在側欄這一欄：掛在整個視窗上時，
-                // 工具列最右邊還會多一個，橫跨整個「正在播放」面板（截圖程式會列出搜尋框在哪）。
-                // 按 Enter 才搜尋，打字當下不查，免得一直呼叫 yt-dlp。
-                .searchable(text: $searchText, placement: .sidebar, prompt: "搜尋 YouTube")
-                .onSubmit(of: .search) {
-                    selection = .search
-                    Task { await library.search(searchText) }
+                // 搜尋框自己畫在側欄上方，不用 `.searchable(placement: .sidebar)`：
+                // 那個搜尋框按 Enter 不會觸發 `.onSubmit(of: .search)`（11/13 在 0.7.8 實測，
+                // `.onSubmit` 放在 `.searchable` 前後都一樣），搜尋整個沒反應。
+                // 按 Enter 才搜尋，打字當下不查，免得一直呼叫 yt-dlp；輸入法選字中的 Enter 不算送出。
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    SidebarSearchField(text: $searchText) {
+                        selection = .search
+                        Task { await library.search(searchText) }
+                    }
                 }
-                // 欄寬要放最外層，包在 .searchable 裡面會失效，側欄被擠到約 144 點。
                 .navigationSplitViewColumnWidth(min: 210, ideal: 240)
         } detail: {
             EpisodeList(item: selection ?? .latest)
@@ -101,6 +102,33 @@ struct ContentView: View {
 }
 
 // MARK: - 側欄
+
+/// 側欄上方的搜尋框（像 Apple Music）。
+struct SidebarSearchField: View {
+    @Binding var text: String
+    let onSubmit: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("搜尋 YouTube", text: $text)
+                .textFieldStyle(.plain)
+                .onSubmit(onSubmit)
+            if !text.isEmpty {
+                Button { text = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("清除")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+        .padding(.horizontal, 10)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
+    }
+}
 
 struct Sidebar: View {
     @Environment(Library.self) private var library
