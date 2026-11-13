@@ -128,18 +128,27 @@ nonisolated enum Captions {
         if let (key, url) = manual.sorted(by: { $0.key < $1.key }).first(where: { target.matches($0.key) }) {
             return track(url, key, isAuto: false)
         }
+        // 原文常帶地區（`en-US`），字幕軌卻只寫語言（`en`、`en-orig`）：先比完整的，再比語言。
         if let original = sources.original?.lowercased() {
-            if let (key, url) = manual.first(where: { $0.key.lowercased() == original })
-                ?? manual.first(where: { $0.key.lowercased().hasPrefix(original + "-") }) {
-                return track(url, key, isAuto: false)
+            let base = String(original.prefix(while: { $0 != "-" }))
+            let names = base == original ? [original] : [original, base]
+            for name in names {
+                if let (key, url) = manual.first(where: { $0.key.lowercased() == name })
+                    ?? manual.sorted(by: { $0.key < $1.key }).first(where: { $0.key.lowercased().hasPrefix(name + "-") }) {
+                    return track(url, key, isAuto: false)
+                }
             }
-            if let (key, url) = auto.first(where: { $0.key.lowercased() == original + "-orig" }) {
-                return track(url, String(key.dropLast(5)), isAuto: true)
+            for name in names {
+                if let (key, url) = auto.first(where: { $0.key.lowercased() == name + "-orig" }) {
+                    return track(url, String(key.dropLast(5)), isAuto: true)
+                }
             }
         }
         // 沒標語言：有人工英文字幕就用，否則用 YouTube 標成原文（`-orig`）的自動字幕。
+        // 有 AI 配音的影片，每條配音都有自己的 `-orig`（2026/11 的 DEF CON 影片有 20 條）：英文優先，其餘照字母排，不要靠字典順序。
         if let url = manual["en"] { return track(url, "en", isAuto: false) }
-        if let (key, url) = auto.first(where: { $0.key.hasSuffix("-orig") }) {
+        let origs = auto.filter { $0.key.hasSuffix("-orig") }.sorted { $0.key < $1.key }
+        if let (key, url) = origs.first(where: { $0.key == "en-orig" }) ?? origs.first {
             return track(url, String(key.dropLast(5)), isAuto: true)
         }
         if manual.count == 1, let (key, url) = manual.first { return track(url, key, isAuto: false) }

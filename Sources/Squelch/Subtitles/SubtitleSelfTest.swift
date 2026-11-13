@@ -21,6 +21,12 @@ extension SelfTest {
         let auto = Captions.choose(info(["live_chat"], ["ja-orig", "ja", "zh-Hant"], language: "ja"), target: .zhHant)
         check(auto?.language == "ja" && auto?.isAuto == true && auto?.url.lastPathComponent == "ja-orig" && auto?.handling == .translate,
               "captions: auto original, not YouTube's translation")
+        // AI 配音的影片：原文標 `en-US`，每條配音都有 `-orig`，要挑英文那條。
+        let dubbed = ["ta-orig", "te-orig", "th", "ar-orig", "en-orig", "ja-orig", "zh-Hant"]
+        let regional = Captions.choose(info([], dubbed, language: "en-US"), target: .zhHant)
+        check(regional?.language == "en" && regional?.url.lastPathComponent == "en-orig", "captions: en-US original picks en-orig among dubbed tracks")
+        let unlabeled = Captions.choose(info([], dubbed, language: nil), target: .zhHant)
+        check(unlabeled?.language == "en", "captions: no original language prefers en-orig")
         let autoJa = Captions.choose(info([], ["ja-orig", "en"], language: "ja"), target: .ja)
         check(autoJa?.handling == .direct, "captions: auto captions already in the target language")
         let chinese = info([], ["zh-Hans-orig", "zh-Hant"], language: "zh-Hans")
