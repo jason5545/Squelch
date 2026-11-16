@@ -59,6 +59,7 @@ enum SelfTest {
         check(unity == [0.3, -0.9], "boost at 100% leaves audio untouched")
 
         subtitleUnits()
+        titleUnits()
         await tools()
         print("yt-dlp: \(YTDLP.binaryPath() ?? "missing") \(await YTDLP.version() ?? "")")
 
@@ -79,6 +80,11 @@ enum SelfTest {
 
         if let ep = episode {
             print("episode: \(ep.id) \(ep.title)")
+            if case .found(let title) = await TitleLanguage.original(videoID: ep.id) {
+                check(!title.isEmpty, "oEmbed original title: \(title)")
+            } else {
+                check(false, "oEmbed original title")
+            }
             do {
                 let started = Date()
                 let stream = try await YTDLP.resolve(videoID: ep.id)
@@ -109,6 +115,57 @@ enum SelfTest {
         persistence(channel: channel)
         print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
         return failures == 0
+    }
+
+    /// `Squelch --play-check <影片 ID>`：某一支影片播不出來時用。不開視窗、不出聲，
+    /// 照 App 的順序解析音軌，再跑自己解碼的 HLS 和 AVPlayer 兩條播放路徑。不帶帳號、不呼叫 Codex。
+    static func playCheck(_ arguments: [String]) async -> Bool {
+        guard let index = arguments.firstIndex(of: "--play-check"), index + 1 < arguments.count,
+              let id = ChannelInput.videoID(arguments[index + 1]) ?? Optional(arguments[index + 1]) else {
+            print("用法：Squelch --play-check <影片 ID 或網址>")
+            return false
+        }
+        YTDLPUpdate.automatic.store(false, ordering: .relaxed)
+        print("yt-dlp: \(YTDLP.binaryPath() ?? "missing") \(await YTDLP.version() ?? "")")
+        do {
+            let started = Date()
+            let stream = try await YTDLP.resolve(videoID: id)
+            print("info  \(stream.title) — \(stream.channelTitle), \(Format.time(stream.duration ?? 0)), local \(stream.isLocal), live \(stream.isLive)")
+            check(true, "resolve (\(fixed(Date().timeIntervalSince(started)))s)")
+            let duration = stream.duration ?? 0
+            if !stream.isLocal && !stream.isLive {
+                await decoding(stream)
+                await segments(stream, duration: duration)
+            }
+            await playback(stream, duration: duration, label: stream.isLocal ? "download" : "AVPlayer")
+            if stream.isLocal { try? FileManager.default.removeItem(at: stream.url) }
+        } catch {
+            check(false, "resolve: \(error.localizedDescription)")
+        }
+        print(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
+        return failures == 0
+    }
+
+    /// 「自動翻譯」設定：清單標題、原文標題怎麼挑，音軌的格式字串。不連網路。
+    private static func titleUnits() {
+        let listed = Episode(id: "x", title: "Translated", channelID: "", channelTitle: "", duration: nil, published: nil)
+        var ep = TitleLanguage.adopt(listed, known: nil)
+        check(ep.listedTitle == "Translated" && ep.title == "Translated", "title: no original yet shows the listed title")
+        ep.originalTitle = "原文"
+        check(TitleLanguage.shown(ep, translate: false) == "原文" && TitleLanguage.shown(ep, translate: true) == "Translated",
+              "title: off shows the original, on shows the listed title")
+        var refetched = listed
+        refetched.title = "Translated again"
+        let again = TitleLanguage.adopt(refetched, known: ep)
+        check(again.originalTitle == "原文" && again.listedTitle == "Translated again", "title: refresh keeps the original title")
+        let wasOn = UserDefaults.standard.object(forKey: TitleLanguage.key)
+        UserDefaults.standard.set(false, forKey: TitleLanguage.key)
+        check(YTDLP.hlsFormat.hasPrefix("234/ba[format_id^=234-]") && !YTDLP.hlsFormat.contains("language"),
+              "audio: off picks the original track (\(YTDLP.hlsFormat))")
+        UserDefaults.standard.set(true, forKey: TitleLanguage.key)
+        check(YTDLP.hlsFormat.hasPrefix("ba[format_id^=234-][language^=\(TitleLanguage.dubLanguage)]")
+              && YTDLP.downloadFormat.contains("[language^="), "audio: on prefers the interface-language dub")
+        if let wasOn { UserDefaults.standard.set(wasOn, forKey: TitleLanguage.key) } else { UserDefaults.standard.removeObject(forKey: TitleLanguage.key) }
     }
 
     /// 內建的 yt-dlp 和 deno、自動更新。整個自我測試都不准用 Homebrew 的 yt-dlp，PATH 也沒有 Homebrew。

@@ -211,11 +211,25 @@ nonisolated enum YTDLP {
     // MARK: 音軌
 
     /// HLS 純音訊（234 高、233 低）：AVPlayer 原生支援，1 秒就緒、跳轉不用等。
-    static let hlsFormat = "234/233"
+    /// 有 AI 配音的影片每種語言一條，代號變成 `234-0`、`234-1`，沒有單純的 234（2026/11/16 老范的影片，
+    /// 原文中文加自動配的英文）。`ba[format_id^=234-]` 照 yt-dlp 的語言排序挑，原文的 language_preference 最高，
+    /// 跟下載備援挑的是同一種語言。
+    /// 「自動翻譯」打開時，先挑介面語言的配音（`[language^=zh]`），沒有才回到原文。
+    static var hlsFormat: String {
+        let original = "234/ba[format_id^=234-]/233/ba[format_id^=233-]"
+        guard TitleLanguage.autoTranslate else { return original }
+        let lang = TitleLanguage.dubLanguage
+        return "ba[format_id^=234-][language^=\(lang)]/ba[format_id^=233-][language^=\(lang)]/" + original
+    }
     /// 備援：下載 m4a 到快取。YouTube 原始的 DASH m4a 會讓 AVFoundation 把長度算成兩倍
     /// （2026/11/11 實測 1011 秒變 2023 秒），以前靠 yt-dlp 叫 ffmpeg 修正容器；
     /// 現在 App 不帶 ffmpeg，改用 AVAssetExportSession passthrough 重新封裝（同一個檔案 0.04 秒，長度 1011.58 秒）。
-    static let downloadFormat = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]"
+    /// 多音軌的影片，yt-dlp 的預設排序會挑原文那條（language_preference 最高）。
+    static var downloadFormat: String {
+        let original = "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]"
+        guard TitleLanguage.autoTranslate else { return original }
+        return "bestaudio[ext=m4a][language^=\(TitleLanguage.dubLanguage)]/" + original
+    }
 
     static var cacheDirectory: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]

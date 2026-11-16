@@ -125,6 +125,7 @@ final class Player {
             }
         }
         nowPlaying.attach(self)
+        library.titlesChanged = { [weak self] in self?.syncTitle() }
         applyVolume()
         stallTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { @Sendable [weak self] _ in
             Task { @MainActor in self?.checkStall() }
@@ -210,6 +211,20 @@ final class Player {
         }
     }
 
+    /// 「自動翻譯」切換或查到原文標題時，正在播的那集也換標題。
+    private func syncTitle() {
+        guard let ep = current, let title = library.episodes[ep.id]?.title ?? Optional(TitleLanguage.shown(ep)),
+              title != ep.title else { return }
+        current?.title = title
+        nowPlaying.update()
+    }
+
+    /// 「自動翻譯」切換：解好的網址是照舊設定挑的音軌，丟掉重解。正在播的這集不換，下一集起生效。
+    func forgetResolvedStreams() {
+        let keep = current.flatMap { id in resolved[id.id].map { (id.id, $0) } }
+        resolved = keep.map { [$0.0: $0.1] } ?? [:]
+    }
+
     // MARK: 播放
 
     func play(_ ep: Episode) {
@@ -276,8 +291,10 @@ final class Player {
         }
         let stream = try await YTDLP.resolve(videoID: id)
         resolved[id] = stream
+        // 影片頁的標題是原文（yt-dlp 預設挑影片本身的語言）。
         let ep = Episode(id: id, title: stream.title, channelID: stream.channelID ?? "",
-                         channelTitle: stream.channelTitle, duration: stream.duration, published: Date())
+                         channelTitle: stream.channelTitle, duration: stream.duration, published: Date(),
+                         originalTitle: stream.title)
         play(ep)
     }
 

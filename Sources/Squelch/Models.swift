@@ -22,6 +22,11 @@ nonisolated struct Episode: Codable, Identifiable, Hashable, Sendable {
     var isStream: Bool = false
     /// 正在直播。舊的 library.json 沒有這個欄位，所以是 Optional。
     var isLive: Bool?
+    /// yt-dlp 清單給的標題。yt-dlp 固定用英文介面抓，有翻譯的影片（例如有 AI 配音）會拿到英文翻譯。
+    /// `title` 是照「自動翻譯」設定顯示的那個（見 `TitleLanguage`）。舊資料沒有這兩個欄位。
+    var listedTitle: String?
+    /// 影片原本的標題（oEmbed），抓到才有。
+    var originalTitle: String?
 
     var liveNow: Bool { isLive == true }
     var watchURL: URL { URL(string: "https://www.youtube.com/watch?v=\(id)")! }

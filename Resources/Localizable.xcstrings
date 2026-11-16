@@ -4706,6 +4706,34 @@
         }
       }
     },
+    "自動翻譯（標題與音軌）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-translate (titles and audio)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動翻訳（タイトルと音声）"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动翻译（标题与音轨）"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動翻譯（標題與音軌）"
+          }
+        }
+      }
+    },
     "自我宣傳": {
       "localizations": {
         "en": {
@@ -4926,6 +4954,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "訂閱提醒"
+          }
+        }
+      }
+    },
+    "語言": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "言語"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "語言"
           }
         }
       }
@@ -5626,6 +5682,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "關掉迷你視窗（照樣在背景播）"
+          }
+        }
+      }
+    },
+    "關閉時一律用影片原本的語言：標題用上傳者取的原文，有 AI 配音的影片播原本的音軌。打開時用 YouTube 翻譯過的標題（YouTube 只給英文版），音軌先挑介面語言的配音，沒有才播原文。正在播的這集不會換音軌。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When off, everything stays in the video’s original language: titles are what the uploader wrote, and videos with AI dubbing play their original audio track. When on, titles are YouTube’s translations (YouTube only provides English ones), and audio uses a dub in the interface language if there is one, otherwise the original. The episode that is playing keeps its audio track."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オフのときは動画の元の言語を使います。タイトルは投稿者が付けた原文、AI 吹き替えのある動画は元の音声を再生します。オンのときは YouTube が翻訳したタイトル（YouTube が提供するのは英語のみ）を使い、音声はインターフェース言語の吹き替えがあればそれを、なければ元の音声を再生します。再生中のエピソードの音声は切り替わりません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭时一律用视频原本的语言：标题用上传者取的原文，有 AI 配音的视频播放原本的音轨。打开时用 YouTube 翻译过的标题（YouTube 只提供英文版），音轨先选界面语言的配音，没有才播放原文。正在播放的这一集不会换音轨。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉時一律用影片原本的語言：標題用上傳者取的原文，有 AI 配音的影片播原本的音軌。打開時用 YouTube 翻譯過的標題（YouTube 只給英文版），音軌先挑介面語言的配音，沒有才播原文。正在播的這集不會換音軌。"
           }
         }
       }

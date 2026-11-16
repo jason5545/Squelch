@@ -111,6 +111,8 @@ struct PlayURLSheet: View {
 struct SettingsView: View {
     @Environment(Account.self) private var account
     @Environment(Library.self) private var library
+    @Environment(Player.self) private var player
+    @AppStorage(TitleLanguage.key) private var autoTranslate = false
     @State private var showingLogin = false
     @AppStorage(YTDLP.customPathKey) private var customPath = ""
     @AppStorage("sb.sponsor") private var sponsor = true
@@ -156,6 +158,11 @@ Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次�
                 Text("Squelch 內建 yt-dlp 和它需要的 deno，不用另外安裝。YouTube 一改版舊的 yt-dlp 就抓不到，所以每天會到 GitHub 查一次，有新版就自動下載到「~/Library/Application Support/Squelch/yt-dlp」。")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            Section("語言") {
+                Toggle("自動翻譯（標題與音軌）", isOn: $autoTranslate)
+                Text("關閉時一律用影片原本的語言：標題用上傳者取的原文，有 AI 配音的影片播原本的音軌。打開時用 YouTube 翻譯過的標題（YouTube 只給英文版），音軌先挑介面語言的配音，沒有才播原文。正在播的這集不會換音軌。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             SubtitleSettings()
             Section("SponsorBlock") {
                 Toggle("跳過贊助片段", isOn: $sponsor)
@@ -169,6 +176,11 @@ Text("帳號只用在：打開訂閱動態、打開觀看記錄時各抓一次�
         .frame(width: 480)
         .sheet(isPresented: $showingLogin) { LoginSheet() }
         .task(id: customPath) { await loadYTDLP() }
+        .onChange(of: autoTranslate) {
+            library.retitle()
+            player.forgetResolvedStreams()
+            Task { await library.fillOriginalTitles() }
+        }
     }
 
     private var ytdlpDescription: String {

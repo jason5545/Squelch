@@ -34,6 +34,13 @@ enum Main {
             }
             dispatchMain()
         }
+        if CommandLine.arguments.contains("--play-check") {
+            Task { @MainActor in
+                let ok = await SelfTest.playCheck(CommandLine.arguments)
+                exit(ok ? 0 : 1)
+            }
+            dispatchMain()
+        }
         if CommandLine.arguments.contains("--selftest") {
             Task { @MainActor in
                 let ok = await SelfTest.run()
@@ -161,6 +168,7 @@ struct SquelchApp: App {
         Settings {
             SettingsView()
                 .environment(library)
+                .environment(player)
                 .environment(account)
                 .environment(subtitles)
         }

@@ -68,6 +68,8 @@ final class Library {
         }
         channels = snap.channels
         episodes = Dictionary(snap.episodes.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        // 0.7.9 以前存的標題就是清單給的標題。
+        for (id, ep) in episodes where ep.listedTitle == nil { episodes[id]?.listedTitle = ep.title }
         progress = snap.progress
         lastPlayed = snap.lastPlayed ?? [:]
         finished = Set(snap.finished)
@@ -136,6 +138,7 @@ final class Library {
         lastRefresh = Date()
         prune()
         save()
+        Task { await fillOriginalTitles() }
     }
 
     // MARK: 訂閱動態（要登入，看的時候才抓）
@@ -156,8 +159,9 @@ final class Library {
             let feed = try await YTDLP.subscriptions(cookies: account.cookieFile)
             await account.importCookieFile()
             for var ep in feed {
-                if let old = episodes[ep.id], !ep.liveNow { ep.published = old.published ?? ep.published }
-                episodes[ep.id] = ep
+                let old = episodes[ep.id]
+                if let old, !ep.liveNow { ep.published = old.published ?? ep.published }
+                episodes[ep.id] = TitleLanguage.adopt(ep, known: old)
             }
             subscriptionFeed = feed.map(\.id)
             subscriptionLive = Set(feed.filter(\.liveNow).map(\.id))
@@ -166,6 +170,7 @@ final class Library {
             applyLiveFlags()
             prune()
             save()
+            Task { await fillOriginalTitles() }
         } catch {
             channelErrors[YTDLP.subscriptionsURL] = error.localizedDescription
         }
@@ -215,13 +220,15 @@ final class Library {
         }
         for ep in found {
             var merged = ep
-            if let old = episodes[ep.id] { merged.published = old.published ?? ep.published }
-            episodes[ep.id] = merged
+            let old = episodes[ep.id]
+            if let old { merged.published = old.published ?? ep.published }
+            episodes[ep.id] = TitleLanguage.adopt(merged, known: old)
         }
         liveFeed = found.map(\.id)
         liveChecked = Date()
         applyLiveFlags()
         save()
+        Task { await fillOriginalTitles() }
     }
 
     /// 直播中的標記以最近一次抓到的為準，直播結束後不會一直標著。
@@ -237,13 +244,59 @@ final class Library {
         channels[index].title = feed.title
         if let avatar = feed.avatar { channels[index].avatar = avatar }
         for var ep in feed.episodes {
-            if let old = episodes[ep.id] {
+            let old = episodes[ep.id]
+            if let old {
                 // 「2 天前」越久越不準，保留第一次看到時的估計。
                 ep.published = old.published ?? ep.published
                 ep.isStream = old.isStream || ep.isStream
             }
-            episodes[ep.id] = ep
+            episodes[ep.id] = TitleLanguage.adopt(ep, known: old)
         }
+    }
+
+    // MARK: 標題語言（設定裡的「自動翻譯」）
+
+    /// 問過 oEmbed 但影片不存在或不能嵌入的，這次開著 App 就不再問。
+    @ObservationIgnored private var titleMisses = Set<String>()
+    @ObservationIgnored private var fillingTitles = false
+    /// 標題換了：`Player` 拿來更新正在播的那集。
+    @ObservationIgnored var titlesChanged: (() -> Void)?
+
+    /// 自動翻譯關著時，替還沒有原文標題的影片問 oEmbed。新的先問；已經問到的存進 library.json，不再問。
+    func fillOriginalTitles() async {
+        guard !TitleLanguage.autoTranslate, !fillingTitles else { return }
+        fillingTitles = true
+        defer { fillingTitles = false }
+        var seen = titleMisses
+        var ids: [String] = []
+        let candidates = searchResults + historyFeed + episodes.values.sorted(by: Self.newestFirst)
+        for ep in candidates where ep.originalTitle == nil && episodes[ep.id]?.originalTitle == nil {
+            if seen.insert(ep.id).inserted { ids.append(ep.id) }
+        }
+        guard !ids.isEmpty else { return }
+        let (found, missing) = await TitleLanguage.originals(for: ids)
+        titleMisses.formUnion(missing)
+        guard !found.isEmpty else { return }
+        for (id, title) in found { episodes[id]?.originalTitle = title }
+        searchResults = searchResults.map { var ep = $0; ep.originalTitle = found[ep.id] ?? ep.originalTitle; return ep }
+        historyFeed = historyFeed.map { var ep = $0; ep.originalTitle = found[ep.id] ?? ep.originalTitle; return ep }
+        retitle()
+        save()
+    }
+
+    /// 照目前的設定重新決定每部影片顯示哪個標題。切換設定時呼叫。
+    func retitle() {
+        let translate = TitleLanguage.autoTranslate
+        for (id, ep) in episodes {
+            let title = TitleLanguage.shown(ep, translate: translate)
+            if title != ep.title { episodes[id]?.title = title }
+        }
+        func shown(_ list: [Episode]) -> [Episode] {
+            list.map { var ep = $0; ep.title = TitleLanguage.shown(ep, translate: translate); return ep }
+        }
+        if searchResults.contains(where: { $0.title != TitleLanguage.shown($0, translate: translate) }) { searchResults = shown(searchResults) }
+        if historyFeed.contains(where: { $0.title != TitleLanguage.shown($0, translate: translate) }) { historyFeed = shown(historyFeed) }
+        titlesChanged?()
     }
 
     /// 每個頻道只留最新 80 部；聽到一半、待播、正在聽的不刪。
@@ -270,6 +323,7 @@ final class Library {
             let results = try await YTDLP.search(q)
             guard searchQuery == q else { return }
             searchResults = results.map(merged)
+            Task { await fillOriginalTitles() }
         } catch {
             guard searchQuery == q else { return }
             searchResults = []
@@ -287,6 +341,7 @@ final class Library {
             let items = try await YTDLP.history(cookies: account.cookieFile)
             await account.importCookieFile()
             historyFeed = items.map(merged)
+            Task { await fillOriginalTitles() }
         } catch {
             historyError = error.localizedDescription
         }
@@ -294,7 +349,7 @@ final class Library {
 
     /// 已經認得的影片用本機資料（有頻道名稱、日期），觀看記錄的項目常常沒有頻道名稱。
     private func merged(_ ep: Episode) -> Episode {
-        guard var known = episodes[ep.id] else { return ep }
+        guard var known = episodes[ep.id] else { return TitleLanguage.adopt(ep, known: nil) }
         known.isLive = ep.isLive ?? known.isLive
         if known.duration == nil { known.duration = ep.duration }
         return known
