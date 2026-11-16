@@ -16,6 +16,31 @@ struct ContentView: View {
     @AppStorage("showPlayerPanel") private var showPanel = true
 
     var body: some View {
+        // 播放列放在分割視窗下面，不用 `.safeAreaInset` 疊在上面：疊上去時側欄和清單的捲動區域
+        // 一路延伸到視窗底，底部內距是 0，最後 84 pt（約兩個頻道）被不透明的播放列蓋住、捲不到。
+        VStack(spacing: 0) {
+            splitView
+            SubtitleStrip()
+            NowPlayingBar(showPanel: $showPanel)
+        }
+        .tint(Theme.amber)
+        .preferredColorScheme(.dark)
+        // 從沒在播變成開始播時，把收起來的面板打開。
+        .onChange(of: player.current?.id) { old, new in
+            if old == nil, new != nil { showPanel = true }
+        }
+        .toolbar { toolbarItems }
+        .sheet(isPresented: $showingAddChannel) { AddChannelSheet() }
+        .sheet(isPresented: $showingPlayURL) { PlayURLSheet() }
+        .sheet(isPresented: $showingLogin) { LoginSheet() }
+        .onKeyPress(.space) {
+            guard player.current != nil else { return .ignored }
+            player.toggle()
+            return .handled
+        }
+    }
+
+    private var splitView: some View {
         NavigationSplitView {
             Sidebar(selection: $selection)
                 // 搜尋框自己畫在側欄上方，不用 `.searchable(placement: .sidebar)`：
@@ -39,20 +64,10 @@ struct ContentView: View {
             PlayerPanel()
                 .inspectorColumnWidth(min: 280, ideal: 320, max: 420)
         }
-        // 播放列橫跨整個視窗底部，播放鍵、進度、音量都在這裡；右側面板放封面和接下來。
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                SubtitleStrip()
-                NowPlayingBar(showPanel: $showPanel)
-            }
-        }
-        .tint(Theme.amber)
-        .preferredColorScheme(.dark)
-        // 從沒在播變成開始播時，把收起來的面板打開。
-        .onChange(of: player.current?.id) { old, new in
-            if old == nil, new != nil { showPanel = true }
-        }
-        .toolbar {
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarItems: some ToolbarContent {
             ToolbarItemGroup {
                 if account.isLoggedIn {
                     Menu {
@@ -89,15 +104,6 @@ struct ContentView: View {
                 .help(library.lastRefresh.map { String(localized: "上次更新：\($0.formatted(date: .omitted, time: .shortened))") } ?? String(localized: "重新整理"))
                 .disabled(library.refreshing)
             }
-        }
-        .sheet(isPresented: $showingAddChannel) { AddChannelSheet() }
-        .sheet(isPresented: $showingPlayURL) { PlayURLSheet() }
-        .sheet(isPresented: $showingLogin) { LoginSheet() }
-        .onKeyPress(.space) {
-            guard player.current != nil else { return .ignored }
-            player.toggle()
-            return .handled
-        }
     }
 }
 
@@ -134,14 +140,19 @@ struct Sidebar: View {
     @Environment(Library.self) private var library
     @Environment(Account.self) private var account
     @Binding var selection: SidebarItem?
+    @AppStorage(ChannelSort.storageKey) private var sort: ChannelSort = .manual
+    // 頻道多時可以把「資料庫」收起來，頻道就有整欄可以用。
+    @AppStorage("sidebarLibraryExpanded") private var libraryExpanded = true
+    @AppStorage("sidebarChannelsExpanded") private var channelsExpanded = true
 
     var body: some View {
         let liveChannels = Set(library.episodes.values.filter(\.liveNow).map(\.channelID))
         let newest = newestByChannel
+        let channels = library.sortedChannels(sort)
         List(selection: $selection) {
             // `.tag` 一定要放在最後（`.badge` 之後）。寫成 `.tag(...).badge(...)` 時 tag 被包在裡面，
             // List 讀不到，有數字的列（直播中、訂閱動態、聽到一半、待播清單）點了都選不到。
-            Section("資料庫") {
+            Section("資料庫", isExpanded: $libraryExpanded) {
                 tile("最新", .latest).tag(SidebarItem.latest)
                 tile("直播中", .live)
                     .badge(library.list(for: .live).count)
@@ -158,10 +169,23 @@ struct Sidebar: View {
                     .tag(SidebarItem.queue)
                 tile("觀看記錄", .history).tag(SidebarItem.history)
             }
-            Section("頻道") {
-                ForEach(library.channels) { channel in
+            Section(isExpanded: $channelsExpanded) {
+                ForEach(channels) { channel in
                     ChannelRow(channel: channel, isLive: liveChannels.contains(channel.id), newest: newest[channel.id])
                         .tag(SidebarItem.channel(channel.id))
+                }
+                // 拖曳排序：自動排序時拖一下就以畫面上的順序改成手動，再套用這次的移動。
+                .onMove { source, destination in
+                    var ids = channels.map(\.id)
+                    ids.move(fromOffsets: source, toOffset: destination)
+                    library.setChannelOrder(ids)
+                    sort = .manual
+                }
+            } header: {
+                HStack(spacing: 4) {
+                    Text("頻道")
+                    Spacer()
+                    ChannelSortMenu(sort: $sort)
                 }
             }
         }
@@ -223,9 +247,19 @@ struct ChannelRow: View {
 /// 頻道的右鍵選單，頁首的「⋯」也用同一份。
 struct ChannelMenu: View {
     @Environment(Library.self) private var library
+    @AppStorage(ChannelSort.storageKey) private var sort: ChannelSort = .manual
     let channel: Channel
 
     var body: some View {
+        // 不用拖曳也能排：照側欄目前的順序移動，自動排序時會改成手動。
+        let ids = library.sortedChannels(sort).map(\.id)
+        Menu("移動") {
+            moveButton("移到最上面", .top, ids)
+            moveButton("上移", .up, ids)
+            moveButton("下移", .down, ids)
+            moveButton("移到最下面", .bottom, ids)
+        }
+        Divider()
         Toggle("檢查直播", isOn: Binding(
             get: { channel.watchLive == true },
             set: { library.setWatchLive(channel.id, $0) }))
@@ -237,6 +271,40 @@ struct ChannelMenu: View {
         }
         Divider()
         Button("移除頻道", role: .destructive) { library.removeChannel(channel.id) }
+    }
+
+    private func moveButton(_ title: LocalizedStringKey, _ move: ChannelMove, _ ids: [String]) -> some View {
+        let result = move.apply(to: ids, moving: channel.id)
+        return Button(title) {
+            guard let result else { return }
+            library.setChannelOrder(result)
+            sort = .manual
+        }
+        .disabled(result == nil)
+    }
+}
+
+/// 側欄「頻道」標題旁的排序選單。
+struct ChannelSortMenu: View {
+    @Binding var sort: ChannelSort
+
+    var body: some View {
+        Menu {
+            Picker("頻道排序", selection: $sort) {
+                Text("手動（可拖曳）").tag(ChannelSort.manual)
+                Text("最近更新").tag(ChannelSort.recent)
+                Text("名稱").tag(ChannelSort.name)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .foregroundStyle(.secondary)
+        .help("頻道排序")
     }
 }
 

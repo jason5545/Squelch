@@ -23,12 +23,20 @@ enum Snapshot {
         // `--width 900`：看窄視窗的排版（主視窗最小 900 寬）。
         let width = CommandLine.arguments.firstIndex(of: "--width").flatMap {
             $0 + 1 < CommandLine.arguments.count ? Double(CommandLine.arguments[$0 + 1]) : nil } ?? 1280
+        // `--height 560`：看矮視窗（側欄頻道多時要能捲）。
+        let height = CommandLine.arguments.firstIndex(of: "--height").flatMap {
+            $0 + 1 < CommandLine.arguments.count ? Double(CommandLine.arguments[$0 + 1]) : nil } ?? 800
         // `--mini`：桌面迷你模式（放在深色底上看圓角和邊框）。
         let mini = CommandLine.arguments.contains("--mini")
+        // `--sidebar`：只畫側欄，底色換成不透明（主視窗裡側欄是毛玻璃，離屏截圖是黑的）。
+        let sidebarOnly = CommandLine.arguments.contains("--sidebar")
         let size = panelOnly ? NSSize(width: 320, height: 820)
-            : mini ? NSSize(width: MiniPlayer.width + 80, height: 260) : NSSize(width: width, height: 800)
+            : sidebarOnly ? NSSize(width: 240, height: height)
+            : mini ? NSSize(width: MiniPlayer.width + 80, height: 260) : NSSize(width: width, height: height)
         let root: AnyView = panelOnly
             ? AnyView(PlayerPanel().background(Color(nsColor: .windowBackgroundColor)))
+            : sidebarOnly ? AnyView(Sidebar(selection: .constant(item)).listStyle(.sidebar)
+                .scrollContentBackground(.hidden).background(Color(white: 0.16)).preferredColorScheme(.dark))
             : mini ? AnyView(ZStack { Color(white: 0.32); MiniPlayer().fixedSize() })
             : AnyView(ContentView(initialSelection: item))
         // `--subtitles`：播放列上方顯示一句字幕。
@@ -58,6 +66,19 @@ enum Snapshot {
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
         print("snapshot: \(url.path)")
         printSearchFields(in: window)
+        printScrollViews(in: window)
+    }
+
+    /// 列出每個捲動區域的可見高度和內容高度：內容比可見高、`scrolls` 卻是 false，就是捲不動。
+    private static func printScrollViews(in window: NSWindow) {
+        func walk(_ view: NSView) {
+            if let scroll = view as? NSScrollView, let doc = scroll.documentView {
+                let frame = scroll.convert(scroll.bounds, to: nil)
+                print("scroll: x=\(Int(frame.minX)) y=\(Int(frame.minY)) width=\(Int(frame.width)) height=\(Int(frame.height)) visible=\(Int(scroll.contentView.bounds.height)) insets=\(Int(scroll.contentInsets.top))/\(Int(scroll.contentInsets.bottom)) content=\(Int(doc.frame.height)) scrolls=\(scroll.hasVerticalScroller) \(type(of: doc))")
+            }
+            view.subviews.forEach(walk)
+        }
+        if let root = window.contentView?.superview { walk(root) }
     }
 
     /// 列出視窗裡的搜尋框在哪：工具列裡的、內容裡的（側欄上方那種），各幾個、多寬、x 在哪。

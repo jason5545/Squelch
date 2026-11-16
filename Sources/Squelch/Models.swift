@@ -69,6 +69,40 @@ nonisolated enum SidebarItem: Hashable, Sendable {
     case channel(String)
 }
 
+/// 側欄頻道的排序。存在 `@AppStorage("channelSort")`。
+nonisolated enum ChannelSort: String, CaseIterable, Sendable {
+    /// 照 `channels` 的順序：加入的先後，可以拖曳或用右鍵選單調整。
+    case manual
+    /// 直播中的在最上面，其他照最新一部影片的時間。
+    case recent
+    /// 照頻道名稱。
+    case name
+
+    static let storageKey = "channelSort"
+}
+
+/// 手動排序時，右鍵選單的移動方式。
+nonisolated enum ChannelMove: Sendable {
+    case up, down, top, bottom
+
+    /// 把 `id` 照這個方式在 `ids` 裡移動；已經到頂或到底就回傳 nil。
+    func apply(to ids: [String], moving id: String) -> [String]? {
+        guard let index = ids.firstIndex(of: id) else { return nil }
+        let target: Int
+        switch self {
+        case .up: target = index - 1
+        case .down: target = index + 1
+        case .top: target = 0
+        case .bottom: target = ids.count - 1
+        }
+        guard target != index, ids.indices.contains(target) else { return nil }
+        var result = ids
+        result.remove(at: index)
+        result.insert(id, at: target)
+        return result
+    }
+}
+
 nonisolated enum Format {
     static func time(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "--:--" }

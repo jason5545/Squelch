@@ -394,6 +394,52 @@ final class Library {
         save()
     }
 
+    /// 側欄顯示的頻道順序。手動就是 `channels` 本身的順序（加入的先後，或使用者排過的）。
+    func sortedChannels(_ sort: ChannelSort) -> [Channel] {
+        Self.sorted(channels, episodes: episodes.values, by: sort)
+    }
+
+    nonisolated static func sorted(_ channels: [Channel], episodes: some Sequence<Episode>, by sort: ChannelSort) -> [Channel] {
+        switch sort {
+        case .manual:
+            return channels
+        case .name:
+            return channels.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        case .recent:
+            // 直播中的放最上面，其他照最新一部的時間；沒有影片的放最後，彼此維持手動順序。
+            var newest: [String: Date] = [:]
+            var live: Set<String> = []
+            for ep in episodes {
+                if ep.liveNow { live.insert(ep.channelID) }
+                if let date = ep.published, date > newest[ep.channelID] ?? .distantPast { newest[ep.channelID] = date }
+            }
+            let order = Dictionary(channels.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+            return channels.sorted { a, b in
+                let la = live.contains(a.id), lb = live.contains(b.id)
+                if la != lb { return la }
+                let da = newest[a.id] ?? .distantPast, db = newest[b.id] ?? .distantPast
+                if da != db { return da > db }
+                return order[a.id, default: 0] < order[b.id, default: 0]
+            }
+        }
+    }
+
+    /// 照給的 ID 順序重排頻道（手動排序）。
+    func setChannelOrder(_ ids: [String]) {
+        let reordered = Self.reordered(channels, ids: ids)
+        guard reordered.map(\.id) != channels.map(\.id) else { return }
+        channels = reordered
+        save()
+    }
+
+    /// 清單裡沒列到的頻道接在後面，維持原本的先後；不會多出或少掉頻道。
+    nonisolated static func reordered(_ channels: [Channel], ids: [String]) -> [Channel] {
+        let rank = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        return channels.enumerated().sorted { a, b in
+            (rank[a.element.id] ?? ids.count + a.offset) < (rank[b.element.id] ?? ids.count + b.offset)
+        }.map(\.element)
+    }
+
     func setIncludeStreams(_ id: String, _ on: Bool) {
         guard let index = channels.firstIndex(where: { $0.id == id }) else { return }
         channels[index].includeStreams = on

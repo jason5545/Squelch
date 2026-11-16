@@ -39,6 +39,7 @@ enum SelfTest {
         check(ChannelInput.videoID("https://www.youtube.com/live/abc-EF_2345") == "abc-EF_2345", "videoID live")
         check(Format.time(3725) == "1:02:05" && Format.time(65) == "1:05", "format time")
         check(Format.rate(1.5) == "1.5×" && Format.rate(2) == "2×", "format rate")
+        channelSortUnits()
 
         nonisolated(unsafe) let artwork = NowPlaying.makeArtwork(NSImage(size: NSSize(width: 32, height: 18)))
         // 要用 async：sync 會直接在呼叫端（主執行緒）跑，測不到。
@@ -147,6 +148,29 @@ enum SelfTest {
     }
 
     /// 「自動翻譯」設定：清單標題、原文標題怎麼挑，音軌的格式字串。不連網路。
+    /// 側欄頻道排序：手動、最近更新、名稱，以及右鍵選單的移動。用假資料，不碰 library.json。
+    private static func channelSortUnits() {
+        let chans = ["b", "a", "c", "d"].map { Channel(id: $0, title: $0 == "a" ? "Alpha" : $0 == "b" ? "beta" : $0 == "c" ? "Gamma" : "delta") }
+        func ep(_ id: String, _ channel: String, daysAgo: Double, live: Bool = false) -> Episode {
+            Episode(id: id, title: id, channelID: channel, channelTitle: channel,
+                    published: Date().addingTimeInterval(-daysAgo * 86400), isLive: live ? true : nil)
+        }
+        let eps = [ep("1", "a", daysAgo: 5), ep("2", "a", daysAgo: 1), ep("3", "b", daysAgo: 3), ep("4", "c", daysAgo: 9, live: true)]
+        func ids(_ list: [Channel]) -> [String] { list.map(\.id) }
+        check(ids(Library.sorted(chans, episodes: eps, by: .manual)) == ["b", "a", "c", "d"], "channel sort: manual keeps saved order")
+        check(ids(Library.sorted(chans, episodes: eps, by: .recent)) == ["c", "a", "b", "d"],
+              "channel sort: recent puts live first, then newest video, no videos last")
+        check(ids(Library.sorted(chans, episodes: eps, by: .name)) == ["a", "b", "d", "c"], "channel sort: name ignores case")
+        check(ids(Library.reordered(chans, ids: ["d", "b"])) == ["d", "b", "a", "c"], "channel sort: reorder keeps unlisted channels after")
+        let order = ["b", "a", "c", "d"]
+        check(ChannelMove.up.apply(to: order, moving: "c") == ["b", "c", "a", "d"]
+              && ChannelMove.down.apply(to: order, moving: "c") == ["b", "a", "d", "c"]
+              && ChannelMove.top.apply(to: order, moving: "d") == ["d", "b", "a", "c"]
+              && ChannelMove.bottom.apply(to: order, moving: "b") == ["a", "c", "d", "b"], "channel sort: move up/down/top/bottom")
+        check(ChannelMove.up.apply(to: order, moving: "b") == nil && ChannelMove.bottom.apply(to: order, moving: "d") == nil,
+              "channel sort: no move past the ends")
+    }
+
     private static func titleUnits() {
         let listed = Episode(id: "x", title: "Translated", channelID: "", channelTitle: "", duration: nil, published: nil)
         var ep = TitleLanguage.adopt(listed, known: nil)
